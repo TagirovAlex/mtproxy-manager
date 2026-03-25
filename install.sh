@@ -10,6 +10,15 @@ APP_DIR="/opt/mtproxy-manager"
 VENV_DIR="${APP_DIR}/.venv"
 MANAGER_SERVICE="mtproxy-manager"
 
+TMP_DIR=""
+
+cleanup() {
+  if [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR:-}" ]]; then
+    rm -rf "${TMP_DIR}"
+  fi
+}
+trap cleanup EXIT
+
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo bash install.sh"
   exit 1
@@ -24,11 +33,10 @@ detect_arch() {
 }
 
 install_mtg_secure() {
-  local arch tmp release_json asset_url checksums_url file_name expected_sha
+  local arch release_json asset_url checksums_url file_name expected_sha
 
   arch="$(detect_arch)"
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "${tmp}"' EXIT
+  TMP_DIR="$(mktemp -d)"
 
   release_json="$(curl -fsSL https://api.github.com/repos/9seconds/mtg/releases/latest)"
   asset_url="$(echo "${release_json}" \
@@ -44,13 +52,13 @@ install_mtg_secure() {
   fi
 
   file_name="$(basename "${asset_url}")"
-  curl -fsSL "${asset_url}" -o "${tmp}/${file_name}"
+  curl -fsSL "${asset_url}" -o "${TMP_DIR}/${file_name}"
 
   expected_sha="${MTG_SHA256:-}"
   if [[ -z "${expected_sha}" ]]; then
     if [[ -n "${checksums_url}" && "${checksums_url}" != "null" ]]; then
-      curl -fsSL "${checksums_url}" -o "${tmp}/checksums.txt"
-      expected_sha="$(grep " ${file_name}\$" "${tmp}/checksums.txt" | awk '{print $1}' | head -n1 || true)"
+      curl -fsSL "${checksums_url}" -o "${TMP_DIR}/checksums.txt"
+      expected_sha="$(grep " ${file_name}\$" "${TMP_DIR}/checksums.txt" | awk '{print $1}' | head -n1 || true)"
     fi
   fi
 
@@ -60,10 +68,10 @@ install_mtg_secure() {
     exit 1
   fi
 
-  echo "${expected_sha}  ${tmp}/${file_name}" | sha256sum -c -
+  echo "${expected_sha}  ${TMP_DIR}/${file_name}" | sha256sum -c -
 
-  tar -xzf "${tmp}/${file_name}" -C "${tmp}"
-  install -m 0755 "$(find "${tmp}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
+  tar -xzf "${TMP_DIR}/${file_name}" -C "${TMP_DIR}"
+  install -m 0755 "$(find "${TMP_DIR}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
 }
 
 apt-get update -y
