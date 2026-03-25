@@ -1,98 +1,21 @@
 {% extends "base.html" %}
-
-{% block title %}Создание ключа — {{ app_name }}{% endblock %}
-
-{% block page_title %}Создание нового ключа{% endblock %}
+{% block title %}Создание инстанса — {{ app_name }}{% endblock %}
+{% block page_title %}Создание инстанса MTG{% endblock %}
 
 {% block content %}
-<div class="key-create-page">
-    <div class="page-header">
-        <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">
-            ← К списку ключей
-        </a>
-    </div>
-    
-    <div class="card card-form">
-        <div class="card-header">
-            <h3>🔑 Новый ключ</h3>
-        </div>
-        
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('keys.create_key') }}" class="form-create-key">
-                {{ form.hidden_tag() }}
-                
-                <div class="form-group">
-                    <label for="name" class="form-label">
-                        Название ключа <span class="required">*</span>
-                    </label>
-                    <input type="text" 
-                           id="name" 
-                           name="name" 
-                           class="form-input {% if form.name.errors %}is-invalid{% endif %}"
-                           value="{{ form.name.data or '' }}"
-                           placeholder="Например: Мой телефон, Рабочий ноутбук..."
-                           maxlength="100"
-                           required 
-                           autofocus>
-                    {% if form.name.errors %}
-                        {% for error in form.name.errors %}
-                        <span class="form-error">{{ error }}</span>
-                        {% endfor %}
-                    {% endif %}
-                    <span class="form-hint">Понятное название для идентификации ключа</span>
-                </div>
-                
-                <div class="form-info">
-                    <h4>ℹ️ Информация</h4>
-                    <ul>
-                        <li>Будет автоматически сгенерирован секрет FakeTLS</li>
-                        <li>Домен маскировки будет выбран случайно из безопасного списка</li>
-                        <li>Дополнительные настройки (лимиты, привязка) доступны после создания</li>
-                    </ul>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        ✨ Создать ключ
-                    </button>
-                    <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">
-                        Отмена
-                    </a>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Подсказки -->
-    <div class="card card-info">
-        <div class="card-header">
-            <h3>💡 Подсказки</h3>
-        </div>
-        <div class="card-body">
-            <div class="tips-list">
-                <div class="tip-item">
-                    <span class="tip-icon">🔐</span>
-                    <div class="tip-content">
-                        <strong>FakeTLS</strong>
-                        <p>Все ключи создаются с поддержкой FakeTLS для максимальной маскировки трафика под обычный HTTPS.</p>
-                    </div>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-icon">📊</span>
-                    <div class="tip-content">
-                        <strong>Лимиты трафика</strong>
-                        <p>После создания ключа вы можете установить лимиты на трафик (дневной, недельный, месячный).</p>
-                    </div>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-icon">🔗</span>
-                    <div class="tip-content">
-                        <strong>Ссылки</strong>
-                        <p>После создания будут доступны три формата ссылок для подключения к прокси.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<form method="POST">
+  {{ form.hidden_tag() }}
+
+  <p>{{ form.name.label }}<br>{{ form.name(size=40) }}</p>
+  <p>{{ form.bind_ip.label }}<br>{{ form.bind_ip(size=20) }}</p>
+  <p>{{ form.bind_port.label }}<br>{{ form.bind_port() }}</p>
+  <p>{{ form.fake_tls_domain.label }}<br>{{ form.fake_tls_domain(size=40) }}</p>
+
+  {% if current_user.is_admin %}
+  <p>{{ form.owner_user_id.label }}<br>{{ form.owner_user_id() }}</p>
+  {% endif %}
+
+  <p>{{ form.notes.label }}<br>{{ form.notes(rows=4, cols=60) }}</p>
+  <p>{{ form.submit(class_="btn btn-primary") }}</p>
+</form>
 {% endblock %}

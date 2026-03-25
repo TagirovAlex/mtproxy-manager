@@ -1,231 +1,49 @@
 {% extends "base.html" %}
-
-{% block title %}Ключи — {{ app_name }}{% endblock %}
-
-{% block page_title %}Ключи прокси{% endblock %}
+{% block title %}Инстансы MTG — {{ app_name }}{% endblock %}
+{% block page_title %}Инстансы MTG{% endblock %}
 
 {% block content %}
-<div class="keys-page">
-    <div class="page-header">
-        <div class="header-left">
-            <!-- Фильтры -->
-            <div class="filters">
-                <a href="{{ url_for('keys.list_keys', status='all') }}" 
-                   class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}">
-                    Все
-                </a>
-                <a href="{{ url_for('keys.list_keys', status='active') }}" 
-                   class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %}">
-                    Активные
-                </a>
-                <a href="{{ url_for('keys.list_keys', status='blocked') }}" 
-                   class="btn btn-sm {% if status_filter == 'blocked' %}btn-primary{% else %}btn-secondary{% endif %}">
-                    Заблокированные
-                </a>
-                <a href="{{ url_for('keys.list_keys', status='inactive') }}" 
-                   class="btn btn-sm {% if status_filter == 'inactive' %}btn-primary{% else %}btn-secondary{% endif %}">
-                    Неактивные
-                </a>
-            </div>
-        </div>
-        <div class="header-right">
-            <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">
-                ➕ Создать ключ
-            </a>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-body">
-            {% if keys.items %}
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Название</th>
-                            <th>Статус</th>
-                            <th>Домен FakeTLS</th>
-                            {% if current_user.is_admin %}
-                            <th>Пользователь</th>
-                            {% endif %}
-                            <th>Трафик</th>
-                            <th>Последняя активность</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for key in keys.items %}
-                        <tr class="{% if key.is_blocked %}row-blocked{% elif not key.is_active %}row-inactive{% endif %}">
-                            <td>
-                                <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" class="key-name">
-                                    {{ key.name }}
-                                </a>
-                            </td>
-                            <td>
-                                {% if key.is_blocked %}
-                                    <span class="badge badge-danger">Заблокирован</span>
-                                {% elif not key.is_active %}
-                                    <span class="badge badge-secondary">Неактивен</span>
-                                {% elif key.check_traffic_limit() %}
-                                    <span class="badge badge-warning">Лимит превышен</span>
-                                {% else %}
-                                    <span class="badge badge-success">Активен</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <code class="domain-badge">{{ key.fake_tls_domain }}</code>
-                            </td>
-                            {% if current_user.is_admin %}
-                            <td>
-                                {% if key.owner %}
-                                    <a href="{{ url_for('admin.user_manage', user_id=key.owner.id) }}">
-                                        {{ key.owner.email }}
-                                    </a>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            {% endif %}
-                            <td>
-                                {% if key.traffic_limit %}
-                                    <div class="traffic-info">
-                                        <span>{{ key.format_traffic(key.traffic_used) }}</span>
-                                        <span class="text-muted"> / {{ key.format_traffic(key.traffic_limit) }}</span>
-                                        <div class="traffic-bar">
-                                            {% set percent = (key.traffic_used / key.traffic_limit * 100) if key.traffic_limit else 0 %}
-                                            <div class="traffic-bar-fill {% if percent > 90 %}danger{% elif percent > 70 %}warning{% endif %}" 
-                                                 style="width: {{ [percent, 100]|min }}%"></div>
-                                        </div>
-                                    </div>
-                                {% else %}
-                                    {{ key.format_traffic(key.total_traffic) }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if key.last_activity %}
-                                    {{ key.last_activity.strftime('%d.%m.%Y %H:%M') }}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group">
-                                    <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" 
-                                       class="btn btn-sm btn-secondary" title="Подробнее">
-                                        👁️
-                                    </a>
-                                    
-                                    <button type="button" 
-                                            class="btn btn-sm btn-secondary copy-link-btn" 
-                                            data-link="{{ key.get_tg_link(server_domain, mtg_port) }}"
-                                            title="Копировать ссылку">
-                                        📋
-                                    </button>
-                                    
-                                    {% if current_user.is_admin %}
-                                        {% if key.is_blocked %}
-                                        <form action="{{ url_for('keys.key_unblock', key_id=key.id) }}" 
-                                              method="POST" class="inline-form">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-success" title="Разблокировать">
-                                                🔓
-                                            </button>
-                                        </form>
-                                        {% else %}
-                                        <form action="{{ url_for('keys.key_block', key_id=key.id) }}" 
-                                              method="POST" class="inline-form">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Заблокировать">
-                                                🔒
-                                            </button>
-                                        </form>
-                                        {% endif %}
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Пагинация -->
-            {% if keys.pages > 1 %}
-            <nav class="pagination-nav">
-                <ul class="pagination">
-                    {% if keys.has_prev %}
-                    <li>
-                        <a href="{{ url_for('keys.list_keys', page=keys.prev_num, status=status_filter) }}" 
-                           class="page-link">← Назад</a>
-                    </li>
-                    {% endif %}
-                    
-                    {% for page_num in keys.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                        {% if page_num %}
-                            <li class="{% if page_num == keys.page %}active{% endif %}">
-                                <a href="{{ url_for('keys.list_keys', page=page_num, status=status_filter) }}" 
-                                   class="page-link">{{ page_num }}</a>
-                            </li>
-                        {% else %}
-                            <li class="disabled"><span class="page-link">...</span></li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if keys.has_next %}
-                    <li>
-                        <a href="{{ url_for('keys.list_keys', page=keys.next_num, status=status_filter) }}" 
-                           class="page-link">Вперёд →</a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">🔑</div>
-                <h4>Ключи не найдены</h4>
-                {% if status_filter != 'all' %}
-                    <p>Нет ключей с выбранным фильтром</p>
-                    <a href="{{ url_for('keys.list_keys', status='all') }}" class="btn btn-secondary">
-                        Показать все
-                    </a>
-                {% else %}
-                    <p>Создайте первый ключ для начала работы</p>
-                    <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">
-                        ➕ Создать ключ
-                    </a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
+<div class="page-header">
+  <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">Создать инстанс</a>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Копирование ссылки
-    document.querySelectorAll('.copy-link-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const link = this.dataset.link;
-            navigator.clipboard.writeText(link).then(function() {
-                // Показываем уведомление
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '✓';
-                btn.classList.add('btn-success');
-                
-                setTimeout(function() {
-                    btn.innerHTML = originalText;
-                    btn.classList.remove('btn-success');
-                }, 1500);
-            }).catch(function(err) {
-                console.error('Ошибка копирования:', err);
-                alert('Не удалось скопировать ссылку');
-            });
-        });
-    });
-});
-</script>
+<form method="get" class="mb-3">
+  <select name="status" onchange="this.form.submit()">
+    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все</option>
+    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
+    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Отключенные</option>
+    <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Заблокированные</option>
+  </select>
+</form>
+
+{% if keys.items %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>Имя</th>
+      <th>Bind</th>
+      <th>Домен</th>
+      <th>Статус</th>
+      <th>Владелец</th>
+      <th>Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for key in keys.items %}
+    <tr>
+      <td><a href="{{ url_for('keys.key_detail', key_id=key.id) }}">{{ key.name }}</a></td>
+      <td>{{ key.bind_ip }}:{{ key.bind_port }}</td>
+      <td>{{ key.fake_tls_domain }}</td>
+      <td>{{ key.status_label }}</td>
+      <td>{% if key.owner %}{{ key.owner.email }}{% else %}—{% endif %}</td>
+      <td>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('keys.key_edit', key_id=key.id) }}">Edit</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Инстансов нет.</p>
+{% endif %}
 {% endblock %}
