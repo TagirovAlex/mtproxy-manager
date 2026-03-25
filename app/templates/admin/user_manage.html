@@ -1,226 +1,139 @@
 {% extends "base.html" %}
 
-{% block title %}Пользователь: {{ user.email }} — {{ app_name }}{% endblock %}
-
-{% block page_title %}Управление пользователем{% endblock %}
+{% block title %}Управление пользователем {{ user.email }} — {{ app_name }}{% endblock %}
+{% block page_title %}Пользователь: {{ user.email }}{% endblock %}
 
 {% block content %}
-<div class="user-manage-page">
-    <div class="page-header">
-        <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">
-            ← К списку пользователей
-        </a>
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+  <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">← К списку пользователей</a>
+  <div style="display:flex;gap:8px;align-items:center;">
+    {% if user.is_admin %}
+      <span class="badge badge-info">Администратор</span>
+    {% endif %}
+    {% if user.is_blocked %}
+      <span class="badge badge-danger">Заблокирован</span>
+    {% elif user.is_approved %}
+      <span class="badge badge-success">Подтвержден</span>
+    {% else %}
+      <span class="badge badge-warning">Ожидает подтверждения</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Профиль</h3></div>
+  <div class="card-body">
+    <p><strong>ID:</strong> {{ user.id }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Создан:</strong> {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else '—' }}</p>
+    <p><strong>Последний вход:</strong> {{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '—' }}</p>
+    <p><strong>Неудачных входов:</strong> {{ user.failed_login_attempts or 0 }}</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Права и статус</h3></div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('admin.user_manage', user_id=user.id) }}">
+      {{ form.hidden_tag() }}
+
+      <p>{{ form.is_approved() }} {{ form.is_approved.label }}</p>
+      <p>{{ form.is_admin() }} {{ form.is_admin.label }}</p>
+      <p>{{ form.is_blocked() }} {{ form.is_blocked.label }}</p>
+
+      <p>{{ form.submit(class_="btn btn-primary") }}</p>
+    </form>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+      {% if not user.is_approved and not user.is_blocked %}
+      <form method="POST" action="{{ url_for('admin.user_approve', user_id=user.id) }}">
+        <button class="btn btn-success">Подтвердить</button>
+      </form>
+      {% endif %}
+
+      {% if not user.is_blocked %}
+      <form method="POST" action="{{ url_for('admin.user_block', user_id=user.id) }}">
+        <button class="btn btn-warning">Заблокировать</button>
+      </form>
+      {% else %}
+      <form method="POST" action="{{ url_for('admin.user_unblock', user_id=user.id) }}">
+        <button class="btn btn-success">Разблокировать</button>
+      </form>
+      {% endif %}
+
+      {% if user.id != current_user.id %}
+      <form method="POST" action="{{ url_for('admin.user_delete', user_id=user.id) }}" onsubmit="return confirm('Удалить пользователя?');">
+        <button class="btn btn-danger">Удалить</button>
+      </form>
+      {% endif %}
     </div>
-    
-    <div class="page-grid">
-        <!-- Основная информация и форма -->
-        <div class="page-main">
-            <div class="card">
-                <div class="card-header">
-                    <h3>👤 {{ user.email }}</h3>
-                    <span class="badge {% if user.is_admin %}badge-admin{% elif user.is_blocked %}badge-danger{% elif not user.is_approved %}badge-warning{% else %}badge-success{% endif %}">
-                        {{ user.get_status() }}
-                    </span>
-                </div>
-                
-                <div class="card-body">
-                    <form method="POST" action="{{ url_for('admin.user_manage', user_id=user.id) }}">
-                        {{ form.hidden_tag() }}
-                        
-                        <div class="form-section">
-                            <h4>Статус аккаунта</h4>
-                            
-                            <div class="form-group form-group-checkbox">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                           name="is_approved" 
-                                           {{ 'checked' if form.is_approved.data else '' }}>
-                                    <span class="checkbox-custom"></span>
-                                    <span class="checkbox-text">Подтверждён</span>
-                                </label>
-                                <span class="form-hint">Пользователь может войти в систему</span>
-                            </div>
-                            
-                            <div class="form-group form-group-checkbox">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                           name="is_admin" 
-                                           {{ 'checked' if form.is_admin.data else '' }}
-                                           {% if user.id == current_user.id %}disabled{% endif %}>
-                                    <span class="checkbox-custom"></span>
-                                    <span class="checkbox-text">Администратор</span>
-                                </label>
-                                <span class="form-hint">Полный доступ к управлению системой</span>
-                                {% if user.id == current_user.id %}
-                                <span class="form-hint text-warning">Нельзя снять права администратора с себя</span>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="form-group form-group-checkbox">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                           name="is_blocked" 
-                                           {{ 'checked' if form.is_blocked.data else '' }}
-                                           {% if user.id == current_user.id %}disabled{% endif %}>
-                                    <span class="checkbox-custom"></span>
-                                    <span class="checkbox-text">Заблокирован</span>
-                                </label>
-                                <span class="form-hint">Пользователь не сможет войти</span>
-                            </div>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">
-                                💾 Сохранить изменения
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- Ключи пользователя -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>🔑 Ключи пользователя ({{ user_keys|length }})</h3>
-                </div>
-                
-                <div class="card-body">
-                    {% if user_keys %}
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Название</th>
-                                    <th>Статус</th>
-                                    <th>Трафик</th>
-                                    <th>Создан</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for key in user_keys %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ url_for('keys.key_detail', key_id=key.id) }}">
-                                            {{ key.name }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        {% if key.is_blocked %}
-                                            <span class="badge badge-danger">Заблокирован</span>
-                                        {% elif not key.is_active %}
-                                            <span class="badge badge-secondary">Неактивен</span>
-                                        {% elif key.check_traffic_limit() %}
-                                            <span class="badge badge-warning">Лимит</span>
-                                        {% else %}
-                                            <span class="badge badge-success">Активен</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ key.format_traffic(key.total_traffic) }}</td>
-                                    <td>{{ key.created_at.strftime('%d.%m.%Y') }}</td>
-                                    <td>
-                                        <form action="{{ url_for('users.unassign_key', user_id=user.id, key_id=key.id) }}" 
-                                              method="POST" class="inline-form">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-sm btn-warning" title="Отвязать">
-                                                ✂️ Отвязать
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="empty-state-small">
-                        <p>У пользователя нет привязанных ключей</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
-        <!-- Боковая панель -->
-        <div class="page-sidebar">
-            <!-- Информация -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>ℹ️ Информация</h3>
-                </div>
-                <div class="card-body">
-                    <div class="info-list">
-                        <div class="info-item">
-                            <span class="info-label">ID:</span>
-                            <span>{{ user.id }}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Email:</span>
-                            <span>{{ user.email }}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Регистрация:</span>
-                            <span>{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Последний вход:</span>
-                            <span>
-                                {% if user.last_login %}
-                                    {{ user.last_login.strftime('%d.%m.%Y %H:%M') }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Неудачных попыток:</span>
-                            <span>{{ user.failed_login_attempts }}</span>
-                        </div>
-                        {% if user.locked_until %}
-                        <div class="info-item">
-                            <span class="info-label">Заблокирован до:</span>
-                            <span class="text-danger">{{ user.locked_until.strftime('%d.%m.%Y %H:%M') }}</span>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Быстрые действия -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>⚡ Действия</h3>
-                </div>
-                <div class="card-body">
-                    <div class="action-buttons">
-                        <a href="{{ url_for('users.login_history', user_id=user.id) }}" 
-                           class="btn btn-secondary btn-block">
-                            📜 История входов
-                        </a>
-                        
-                        <form action="{{ url_for('users.reset_password', user_id=user.id) }}" 
-                              method="POST"
-                              onsubmit="return confirm('Сбросить пароль пользователя? Будет сгенерирован временный пароль.');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-warning btn-block">
-                                🔐 Сбросить пароль
-                            </button>
-                        </form>
-                        
-                        {% if user.id != current_user.id %}
-                        <form action="{{ url_for('admin.user_delete', user_id=user.id) }}" 
-                              method="POST"
-                              onsubmit="return confirm('Удалить пользователя {{ user.email }}? Это действие необратимо!');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-danger btn-block">
-                                🗑️ Удалить пользователя
-                            </button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>Инстансы пользователя</h3>
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('users.user_keys', user_id=user.id) }}">Полный список</a>
+  </div>
+  <div class="card-body">
+    {% if user_keys %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Имя</th>
+          <th>Bind</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key in user_keys %}
+        <tr>
+          <td>{{ key.name }}</td>
+          <td>{{ key.bind_ip }}:{{ key.bind_port }}</td>
+          <td>
+            {% if key.is_blocked %}
+              <span class="badge badge-danger">Заблокирован</span>
+            {% elif key.is_enabled %}
+              <span class="badge badge-success">Включен</span>
+            {% else %}
+              <span class="badge badge-secondary">Выключен</span>
+            {% endif %}
+          </td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a class="btn btn-sm btn-primary" href="{{ url_for('keys.key_detail', key_id=key.id) }}">Открыть</a>
+            <form method="POST" action="{{ url_for('users.unassign_key', user_id=user.id, key_id=key.id) }}">
+              <button class="btn btn-sm btn-warning">Отвязать</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>У пользователя нет привязанных инстансов.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Сброс пароля</h3></div>
+  <div class="card-body">
+    <form method="POST" action="{{ url_for('users.reset_password', user_id=user.id) }}">
+      <label for="new_password"><strong>Новый пароль</strong></label><br>
+      <input id="new_password" name="new_password" type="password" minlength="8" required>
+      <button class="btn btn-warning" type="submit">Обновить пароль</button>
+    </form>
+    <p style="margin-top:8px;color:#666;">
+      Пароль не выводится в интерфейс после изменения.
+    </p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>История входов</h3></div>
+  <div class="card-body">
+    <a class="btn btn-secondary" href="{{ url_for('users.login_history', user_id=user.id) }}">Открыть историю входов</a>
+  </div>
 </div>
 {% endblock %}

@@ -1,189 +1,60 @@
 {% extends "base.html" %}
 
-{% block title %}История входов: {{ user.email }} — {{ app_name }}{% endblock %}
-
-{% block page_title %}История входов пользователя{% endblock %}
+{% block title %}История входов {{ user.email }} — {{ app_name }}{% endblock %}
+{% block page_title %}История входов: {{ user.email }}{% endblock %}
 
 {% block content %}
-<div class="login-history-page">
-    <div class="page-header">
-        <div class="header-left">
-            <a href="{{ url_for('admin.user_manage', user_id=user.id) }}" class="btn btn-secondary">
-                ← К профилю пользователя
-            </a>
-        </div>
-        <div class="header-right">
-            <span class="user-email">{{ user.email }}</span>
-        </div>
-    </div>
-    
-    <!-- Статистика -->
-    <div class="stats-cards">
-        <div class="stat-card-small">
-            <span class="stat-value">{{ attempts.total }}</span>
-            <span class="stat-label">Всего попыток</span>
-        </div>
-        <div class="stat-card-small stat-success">
-            <span class="stat-value">
-                {{ attempts.items|selectattr('success')|list|length if attempts.items else 0 }}
-            </span>
-            <span class="stat-label">Успешных (на странице)</span>
-        </div>
-        <div class="stat-card-small stat-danger">
-            <span class="stat-value">
-                {{ attempts.items|rejectattr('success')|list|length if attempts.items else 0 }}
-            </span>
-            <span class="stat-label">Неудачных (на странице)</span>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3>🕐 История попыток входа</h3>
-        </div>
-        
-        <div class="card-body">
-            {% if attempts.items %}
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Дата и время</th>
-                            <th>IP адрес</th>
-                            <th>Статус</th>
-                            <th>User Agent</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for attempt in attempts.items %}
-                        <tr class="{% if not attempt.success %}row-danger{% endif %}">
-                            <td>
-                                <span class="datetime">
-                                    {{ attempt.timestamp.strftime('%d.%m.%Y') }}
-                                    <span class="time">{{ attempt.timestamp.strftime('%H:%M:%S') }}</span>
-                                </span>
-                            </td>
-                            <td>
-                                <code class="ip-address">{{ attempt.ip_address }}</code>
-                            </td>
-                            <td>
-                                {% if attempt.success %}
-                                    <span class="badge badge-success">✓ Успешно</span>
-                                {% else %}
-                                    <span class="badge badge-danger">✗ Неудачно</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if attempt.user_agent %}
-                                    <span class="user-agent" title="{{ attempt.user_agent }}">
-                                        {{ attempt.user_agent[:60] }}{% if attempt.user_agent|length > 60 %}...{% endif %}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Пагинация -->
-            {% if attempts.pages > 1 %}
-            <nav class="pagination-nav">
-                <ul class="pagination">
-                    {% if attempts.has_prev %}
-                    <li>
-                        <a href="{{ url_for('users.login_history', user_id=user.id, page=attempts.prev_num) }}" 
-                           class="page-link">← Назад</a>
-                    </li>
-                    {% endif %}
-                    
-                    {% for page_num in attempts.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                        {% if page_num %}
-                            <li class="{% if page_num == attempts.page %}active{% endif %}">
-                                <a href="{{ url_for('users.login_history', user_id=user.id, page=page_num) }}" 
-                                   class="page-link">{{ page_num }}</a>
-                            </li>
-                        {% else %}
-                            <li class="disabled"><span class="page-link">...</span></li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if attempts.has_next %}
-                    <li>
-                        <a href="{{ url_for('users.login_history', user_id=user.id, page=attempts.next_num) }}" 
-                           class="page-link">Вперёд →</a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-            {% endif %}
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">📋</div>
-                <h4>История пуста</h4>
-                <p>Нет записей о попытках входа для этого пользователя</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- Информация о пользователе -->
-    <div class="card card-info">
-        <div class="card-header">
-            <h3>ℹ️ Информация о пользователе</h3>
-        </div>
-        <div class="card-body">
-            <div class="info-list">
-                <div class="info-item">
-                    <span class="info-label">Email:</span>
-                    <span>{{ user.email }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Статус:</span>
-                    <span class="badge {% if user.is_blocked %}badge-danger{% elif not user.is_approved %}badge-warning{% else %}badge-success{% endif %}">
-                        {{ user.get_status() }}
-                    </span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Неудачных попыток подряд:</span>
-                    <span class="{% if user.failed_login_attempts > 0 %}text-warning{% endif %}">
-                        {{ user.failed_login_attempts }}
-                    </span>
-                </div>
-                {% if user.locked_until %}
-                <div class="info-item">
-                    <span class="info-label">Заблокирован до:</span>
-                    <span class="text-danger">{{ user.locked_until.strftime('%d.%m.%Y %H:%M:%S') }}</span>
-                </div>
-                {% endif %}
-                <div class="info-item">
-                    <span class="info-label">Последний успешный вход:</span>
-                    <span>
-                        {% if user.last_login %}
-                            {{ user.last_login.strftime('%d.%m.%Y %H:%M:%S') }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-            
-            {% if user.failed_login_attempts > 0 or user.locked_until %}
-            <div class="action-section">
-                <form action="{{ url_for('admin.user_unblock', user_id=user.id) }}" 
-                      method="POST" 
-                      class="inline-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-warning">
-                        🔓 Сбросить блокировку и счётчик попыток
-                    </button>
-                </form>
-            </div>
-            {% endif %}
-        </div>
-    </div>
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+  <a href="{{ url_for('admin.user_manage', user_id=user.id) }}" class="btn btn-secondary">← К пользователю</a>
+  <span class="badge badge-info">Записей: {{ attempts.total }}</span>
 </div>
+
+{% if attempts.items %}
+<table class="table" style="margin-top:16px;">
+  <thead>
+    <tr>
+      <th>Дата/время</th>
+      <th>Результат</th>
+      <th>IP</th>
+      <th>Email</th>
+      <th>User-Agent</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in attempts.items %}
+    <tr>
+      <td>{{ item.timestamp.strftime('%Y-%m-%d %H:%M:%S') if item.timestamp else "—" }}</td>
+      <td>
+        {% if item.success %}
+          <span class="badge badge-success">Success</span>
+        {% else %}
+          <span class="badge badge-danger">Fail</span>
+        {% endif %}
+      </td>
+      <td>{{ item.ip_address if item.ip_address else "—" }}</td>
+      <td>{{ item.email if item.email else "—" }}</td>
+      <td style="max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        {{ item.user_agent if item.user_agent else "—" }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination" style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+  {% if attempts.has_prev %}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('users.login_history', user_id=user.id, page=attempts.prev_num) }}">← Назад</a>
+  {% endif %}
+
+  <span>Страница {{ attempts.page }} из {{ attempts.pages if attempts.pages > 0 else 1 }}</span>
+
+  {% if attempts.has_next %}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('users.login_history', user_id=user.id, page=attempts.next_num) }}">Вперед →</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="alert alert-info" style="margin-top:16px;">
+  История входов пуста.
+</div>
+{% endif %}
 {% endblock %}

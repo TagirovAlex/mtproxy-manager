@@ -18,6 +18,7 @@ from wtforms.validators import (
     Optional,
     NumberRange,
 )
+
 from app.models import User, ProxyInstance
 
 
@@ -61,7 +62,7 @@ class ProfileForm(FlaskForm):
 
 
 class CreateKeyForm(FlaskForm):
-    name = StringField("Названи�� инстанса", validators=[DataRequired(), Length(min=1, max=100)])
+    name = StringField("Название инстанса", validators=[DataRequired(), Length(min=1, max=100)])
     bind_port = IntegerField("Порт", validators=[DataRequired(), NumberRange(min=1, max=65535)])
     bind_ip = StringField("IP", validators=[DataRequired(), Length(min=3, max=64)], default="0.0.0.0")
     fake_tls_domain = StringField("Домен FakeTLS", validators=[DataRequired(), Length(min=3, max=255)])
@@ -75,7 +76,8 @@ class CreateKeyForm(FlaskForm):
         self.owner_user_id.choices = [(0, "— Не привязан —")] + [(u.id, u.email) for u in users]
 
     def validate_bind_port(self, field):
-        if ProxyInstance.query.filter_by(bind_ip=self.bind_ip.data.strip(), bind_port=field.data).first():
+        bind_ip = (self.bind_ip.data or "").strip()
+        if ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=field.data).first():
             raise ValidationError("Этот IP:порт уже занят другим инстансом")
 
 
@@ -97,7 +99,8 @@ class EditKeyForm(FlaskForm):
         self.owner_user_id.choices = [(0, "— Не привязан —")] + [(u.id, u.email) for u in users]
 
     def validate_bind_port(self, field):
-        query = ProxyInstance.query.filter_by(bind_ip=self.bind_ip.data.strip(), bind_port=field.data)
+        bind_ip = (self.bind_ip.data or "").strip()
+        query = ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=field.data)
         if self.instance_id:
             query = query.filter(ProxyInstance.id != self.instance_id)
         if query.first():
@@ -113,9 +116,15 @@ class UserManageForm(FlaskForm):
 
 class SettingsForm(FlaskForm):
     server_domain = StringField("Домен сервера", validators=[DataRequired(), Length(max=255)])
-    max_keys_per_user = IntegerField("Максимум инстансов на пользователя", validators=[DataRequired(), NumberRange(min=1, max=100)])
+    max_keys_per_user = IntegerField(
+        "Максимум инстансов на пользователя",
+        validators=[DataRequired(), NumberRange(min=1, max=100)],
+    )
     auto_backup_enabled = BooleanField("Автоматический бэкап")
-    auto_backup_interval = SelectField("Интервал бэкапа", choices=[("daily", "Ежедневно"), ("weekly", "Еженедельно"), ("monthly", "Ежемесячно")])
+    auto_backup_interval = SelectField(
+        "Интервал бэкапа",
+        choices=[("daily", "Ежедневно"), ("weekly", "Еженедельно"), ("monthly", "Ежемесячно")],
+    )
     submit = SubmitField("Сохранить настройки")
 
 

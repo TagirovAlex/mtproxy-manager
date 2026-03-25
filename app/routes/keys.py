@@ -31,9 +31,17 @@ def list_keys():
     elif status_filter == "inactive":
         query = query.filter_by(is_enabled=False)
 
-    instances = query.order_by(ProxyInstance.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    instances = query.order_by(ProxyInstance.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
     server_domain = Settings.get("server_domain", "localhost")
-    return render_template("admin/keys/list.html", keys=instances, status_filter=status_filter, server_domain=server_domain)
+
+    return render_template(
+        "admin/keys/list.html",
+        keys=instances,
+        status_filter=status_filter,
+        server_domain=server_domain,
+    )
 
 
 @keys_bp.route("/create", methods=["GET", "POST"])
@@ -80,9 +88,15 @@ def key_detail(key_id):
         "https": instance.get_https_link(server_domain),
         "tme": instance.get_https_link(server_domain).replace("https://", ""),
     }
-    status = get_mtg_service().instance_status(instance.id)
+    service_status = get_mtg_service().instance_status(instance.id)
 
-    return render_template("admin/keys/detail.html", key=instance, links=links, service_status=status, server_domain=server_domain)
+    return render_template(
+        "admin/keys/detail.html",
+        key=instance,
+        links=links,
+        service_status=service_status,
+        server_domain=server_domain,
+    )
 
 
 @keys_bp.route("/<key_id>/edit", methods=["GET", "POST"])
@@ -107,8 +121,8 @@ def key_edit(key_id):
         instance.is_enabled = form.is_enabled.data
         instance.is_blocked = form.is_blocked.data
         instance.notes = form.notes.data
-
         db.session.commit()
+
         ok, msg = get_mtg_service().update_instance(instance, regenerate_secret=False)
         flash("Сохранено" if ok else msg, "success" if ok else "danger")
         return redirect(url_for("keys.key_detail", key_id=instance.id))
@@ -136,6 +150,7 @@ def key_start(key_id):
     if not _can_access(instance):
         flash("Доступ запрещен", "danger")
         return redirect(url_for("keys.list_keys"))
+
     ok, msg = get_mtg_service().start_instance(instance.id)
     flash("Запущен" if ok else msg, "success" if ok else "danger")
     return redirect(url_for("keys.key_detail", key_id=instance.id))
@@ -148,6 +163,7 @@ def key_stop(key_id):
     if not _can_access(instance):
         flash("Доступ запрещен", "danger")
         return redirect(url_for("keys.list_keys"))
+
     ok, msg = get_mtg_service().stop_instance(instance.id)
     flash("Остановлен" if ok else msg, "success" if ok else "danger")
     return redirect(url_for("keys.key_detail", key_id=instance.id))
@@ -160,6 +176,7 @@ def key_restart(key_id):
     if not _can_access(instance):
         flash("Доступ запрещен", "danger")
         return redirect(url_for("keys.list_keys"))
+
     ok, msg = get_mtg_service().restart_instance(instance.id)
     flash("Перезапущен" if ok else msg, "success" if ok else "danger")
     return redirect(url_for("keys.key_detail", key_id=instance.id))
@@ -175,6 +192,7 @@ def key_toggle(key_id):
 
     instance.is_enabled = not instance.is_enabled
     db.session.commit()
+
     if instance.is_enabled:
         get_mtg_service().start_instance(instance.id)
     else:
@@ -190,10 +208,12 @@ def key_block(key_id):
     if not current_user.is_admin:
         flash("Только для администратора", "danger")
         return redirect(url_for("keys.list_keys"))
+
     instance = ProxyInstance.query.get_or_404(key_id)
     instance.is_blocked = True
     db.session.commit()
     get_mtg_service().stop_instance(instance.id)
+
     flash("Инстанс заблокирован", "success")
     return redirect(url_for("keys.key_detail", key_id=instance.id))
 
@@ -204,9 +224,11 @@ def key_unblock(key_id):
     if not current_user.is_admin:
         flash("Только для администратора", "danger")
         return redirect(url_for("keys.list_keys"))
+
     instance = ProxyInstance.query.get_or_404(key_id)
     instance.is_blocked = False
     db.session.commit()
+
     flash("Инстанс разблокирован", "success")
     return redirect(url_for("keys.key_detail", key_id=instance.id))
 
@@ -218,6 +240,7 @@ def key_delete(key_id):
     if not _can_access(instance):
         flash("Доступ запрещен", "danger")
         return redirect(url_for("keys.list_keys"))
+
     ok, msg = get_mtg_service().delete_instance(instance)
     flash(msg, "success" if ok else "danger")
     return redirect(url_for("keys.list_keys"))

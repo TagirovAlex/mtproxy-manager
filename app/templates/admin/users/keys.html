@@ -1,193 +1,62 @@
 {% extends "base.html" %}
 
-{% block title %}Ключи пользователя: {{ user.email }} — {{ app_name }}{% endblock %}
-
-{% block page_title %}Ключи пользователя{% endblock %}
+{% block title %}Инстансы пользователя {{ user.email }} — {{ app_name }}{% endblock %}
+{% block page_title %}Инстансы: {{ user.email }}{% endblock %}
 
 {% block content %}
-<div class="user-keys-page">
-    <div class="page-header">
-        <div class="header-left">
-            <a href="{{ url_for('admin.user_manage', user_id=user.id) }}" class="btn btn-secondary">
-                ← К профилю пользователя
-            </a>
-        </div>
-        <div class="header-right">
-            <span class="user-email">{{ user.email }}</span>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h3>🔑 Ключи пользователя ({{ keys|length }})</h3>
-        </div>
-        
-        <div class="card-body">
-            {% if keys %}
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Название</th>
-                            <th>Статус</th>
-                            <th>Домен FakeTLS</th>
-                            <th>Трафик</th>
-                            <th>Последняя активность</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for key in keys %}
-                        <tr class="{% if key.is_blocked %}row-blocked{% elif not key.is_active %}row-inactive{% endif %}">
-                            <td>{{ key.id }}</td>
-                            <td>
-                                <a href="{{ url_for('keys.key_detail', key_id=key.id) }}">
-                                    {{ key.name }}
-                                </a>
-                            </td>
-                            <td>
-                                {% if key.is_blocked %}
-                                    <span class="badge badge-danger">Заблокирован</span>
-                                {% elif not key.is_active %}
-                                    <span class="badge badge-secondary">Неактивен</span>
-                                {% elif key.check_traffic_limit() %}
-                                    <span class="badge badge-warning">Лимит</span>
-                                {% else %}
-                                    <span class="badge badge-success">Активен</span>
-                                {% endif %}
-                            </td>
-                            <td><code>{{ key.fake_tls_domain }}</code></td>
-                            <td>
-                                {% if key.traffic_limit %}
-                                    {{ key.format_traffic(key.traffic_used) }} / {{ key.format_traffic(key.traffic_limit) }}
-                                {% else %}
-                                    {{ key.format_traffic(key.total_traffic) }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if key.last_activity %}
-                                    {{ key.last_activity.strftime('%d.%m.%Y %H:%M') }}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="btn-group">
-                                    <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" 
-                                       class="btn btn-sm btn-secondary" title="Подробнее">
-                                        👁️
-                                    </a>
-                                    <a href="{{ url_for('keys.key_edit', key_id=key.id) }}" 
-                                       class="btn btn-sm btn-secondary" title="Редактировать">
-                                        ✏️
-                                    </a>
-                                    <form action="{{ url_for('users.unassign_key', user_id=user.id, key_id=key.id) }}" 
-                                          method="POST" 
-                                          class="inline-form"
-                                          onsubmit="return confirm('Отвязать ключ от пользователя?');">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-sm btn-warning" title="Отвязать">
-                                            ✂️
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Сводка -->
-            <div class="keys-summary">
-                <div class="summary-item">
-                    <span class="summary-label">Всего ключей:</span>
-                    <strong>{{ keys|length }}</strong>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Активных:</span>
-                    <strong>{{ keys|selectattr('is_active')|selectattr('is_blocked', 'false')|list|length }}</strong>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Общий трафик:</span>
-                    <strong>{{ keys|sum(attribute='total_traffic')|filesizeformat }}</strong>
-                </div>
-            </div>
-            
-            {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">🔑</div>
-                <h4>У пользователя нет ключей</h4>
-                <p>Вы можете привязать существующий ключ к этому пользователю</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- Привязка ключа -->
-    <div class="card">
-        <div class="card-header">
-            <h3>➕ Привязать ключ</h3>
-        </div>
-        <div class="card-body">
-            <form method="POST" action="{{ url_for('users.assign_key', user_id=user.id) }}" class="form-assign-key">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
-                <div class="form-row">
-                    <div class="form-group form-group-grow">
-                        <label for="key_id" class="form-label">Выберите непривязанный ключ</label>
-                        <select id="key_id" name="key_id" class="form-select" required>
-                            <option value="">— Выберите ключ —</option>
-                            <!-- Загружается через JS -->
-                        </select>
-                    </div>
-                    <div class="form-group form-group-action">
-                        <button type="submit" class="btn btn-primary" id="assign-btn" disabled>
-                            Привязать
-                        </button>
-                    </div>
-                </div>
-            </form>
-            
-            <p class="form-hint">
-                Отображаются только ключи, не привязанные к другим пользователям.
-                <a href="{{ url_for('keys.create_key') }}">Создать новый ключ →</a>
-            </p>
-        </div>
-    </div>
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+  <a href="{{ url_for('admin.user_manage', user_id=user.id) }}" class="btn btn-secondary">← К управлению пользователем</a>
+  <span class="badge badge-info">Всего: {{ keys|length }}</span>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const keySelect = document.getElementById('key_id');
-    const assignBtn = document.getElementById('assign-btn');
-    
-    // Загрузка непривязанных ключей
-    fetch('{{ url_for("users.api_unassigned_keys") }}')
-        .then(response => response.json())
-        .then(data => {
-            if (data.length === 0) {
-                keySelect.innerHTML = '<option value="">Нет доступных ключей</option>';
-            } else {
-                let options = '<option value="">— Выберите ключ —</option>';
-                data.forEach(function(key) {
-                    options += `<option value="${key.id}">${key.name} (${key.status})</option>`;
-                });
-                keySelect.innerHTML = options;
-            }
-        })
-        .catch(error => {
-            console.error('Ошибка загрузки ключей:', error);
-            keySelect.innerHTML = '<option value="">Ошибка загрузки</option>';
-        });
-    
-    // Активация кнопки при выборе
-    keySelect.addEventListener('change', function() {
-        assignBtn.disabled = !this.value;
-    });
-});
-</script>
+{% if keys %}
+<table class="table" style="margin-top:16px;">
+  <thead>
+    <tr>
+      <th>Имя</th>
+      <th>Bind</th>
+      <th>FakeTLS</th>
+      <th>Статус</th>
+      <th>Создан</th>
+      <th>Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for key in keys %}
+    <tr>
+      <td>
+        <a href="{{ url_for('keys.key_detail', key_id=key.id) }}">{{ key.name }}</a>
+      </td>
+      <td>{{ key.bind_ip }}:{{ key.bind_port }}</td>
+      <td>{{ key.fake_tls_domain }}</td>
+      <td>
+        {% if key.is_blocked %}
+          <span class="badge badge-danger">Заблокирован</span>
+        {% elif key.is_enabled %}
+          <span class="badge badge-success">Включен</span>
+        {% else %}
+          <span class="badge badge-secondary">Выключен</span>
+        {% endif %}
+      </td>
+      <td>{{ key.created_at.strftime('%Y-%m-%d %H:%M') if key.created_at else '—' }}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('keys.key_detail', key_id=key.id) }}">Открыть</a>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('keys.key_edit', key_id=key.id) }}">Edit</a>
+
+        <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
+          <button class="btn btn-sm btn-success">Start</button>
+        </form>
+        <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
+          <button class="btn btn-sm btn-warning">Stop</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="alert alert-info" style="margin-top:16px;">
+  У пользователя пока нет привязанных инстансов.
+</div>
+{% endif %}
 {% endblock %}

@@ -1,49 +1,106 @@
 {% extends "base.html" %}
+
 {% block title %}Инстансы MTG — {{ app_name }}{% endblock %}
 {% block page_title %}Инстансы MTG{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">Создать инстанс</a>
+
+  <form method="get" style="display:flex;gap:8px;align-items:center;">
+    <label for="status">Статус:</label>
+    <select id="status" name="status" onchange="this.form.submit()">
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все</option>
+      <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
+      <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Отключенные</option>
+      <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Заблокированные</option>
+    </select>
+  </form>
 </div>
 
-<form method="get" class="mb-3">
-  <select name="status" onchange="this.form.submit()">
-    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все</option>
-    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Активные</option>
-    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Отключенные</option>
-    <option value="blocked" {% if status_filter == 'blocked' %}selected{% endif %}>Заблокированные</option>
-  </select>
-</form>
-
 {% if keys.items %}
-<table class="table">
+<table class="table" style="margin-top:16px;">
   <thead>
     <tr>
       <th>Имя</th>
       <th>Bind</th>
-      <th>Домен</th>
-      <th>Статус</th>
+      <th>FakeTLS</th>
       <th>Владелец</th>
+      <th>Статус</th>
+      <th>Ссылка</th>
       <th>Действия</th>
     </tr>
   </thead>
   <tbody>
     {% for key in keys.items %}
     <tr>
-      <td><a href="{{ url_for('keys.key_detail', key_id=key.id) }}">{{ key.name }}</a></td>
+      <td>
+        <a href="{{ url_for('keys.key_detail', key_id=key.id) }}">{{ key.name }}</a>
+      </td>
       <td>{{ key.bind_ip }}:{{ key.bind_port }}</td>
       <td>{{ key.fake_tls_domain }}</td>
-      <td>{{ key.status_label }}</td>
       <td>{% if key.owner %}{{ key.owner.email }}{% else %}—{% endif %}</td>
       <td>
+        {% if key.is_blocked %}
+          <span class="badge badge-danger">Заблокирован</span>
+        {% elif key.is_enabled %}
+          <span class="badge badge-success">Включен</span>
+        {% else %}
+          <span class="badge badge-secondary">Выключен</span>
+        {% endif %}
+      </td>
+      <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        {{ key.get_https_link(server_domain) }}
+      </td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;">
+        <a class="btn btn-sm btn-primary" href="{{ url_for('keys.key_detail', key_id=key.id) }}">Открыть</a>
         <a class="btn btn-sm btn-secondary" href="{{ url_for('keys.key_edit', key_id=key.id) }}">Edit</a>
+
+        <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
+          <button class="btn btn-sm btn-success">Start</button>
+        </form>
+        <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
+          <button class="btn btn-sm btn-warning">Stop</button>
+        </form>
+        <form method="post" action="{{ url_for('keys.key_restart', key_id=key.id) }}">
+          <button class="btn btn-sm btn-info">Restart</button>
+        </form>
+
+        {% if current_user.is_admin %}
+          {% if key.is_blocked %}
+          <form method="post" action="{{ url_for('keys.key_unblock', key_id=key.id) }}">
+            <button class="btn btn-sm btn-success">Unblock</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('keys.key_block', key_id=key.id) }}">
+            <button class="btn btn-sm btn-danger">Block</button>
+          </form>
+          {% endif %}
+        {% endif %}
+
+        <form method="post" action="{{ url_for('keys.key_delete', key_id=key.id) }}" onsubmit="return confirm('Удалить инстанс?');">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<div class="pagination" style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+  {% if keys.has_prev %}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('keys.list_keys', page=keys.prev_num, status=status_filter) }}">← Назад</a>
+  {% endif %}
+
+  <span>Страница {{ keys.page }} из {{ keys.pages if keys.pages > 0 else 1 }}</span>
+
+  {% if keys.has_next %}
+    <a class="btn btn-sm btn-secondary" href="{{ url_for('keys.list_keys', page=keys.next_num, status=status_filter) }}">Вперед →</a>
+  {% endif %}
+</div>
 {% else %}
-<p>Инстансов нет.</p>
+<div class="alert alert-info" style="margin-top:16px;">
+  Инстансов пока нет.
+</div>
 {% endif %}
 {% endblock %}

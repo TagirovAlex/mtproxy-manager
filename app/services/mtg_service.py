@@ -1,6 +1,7 @@
 import os
 import subprocess
 from typing import Optional, Dict, Tuple, List
+
 from flask import current_app
 
 from app import db
@@ -28,19 +29,15 @@ class MTGService:
     def is_installed(self) -> bool:
         return os.path.isfile(self.mtg_binary) and os.access(self.mtg_binary, os.X_OK)
 
-    def _systemctl(self, action: str, unit: str) -> Tuple[bool, str]:
-        cmd = ["systemctl", action, unit]
-        if self.use_sudo:
-            cmd = ["sudo", "-n"] + cmd
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                return True, "ok"
-            return False, (result.stderr or result.stdout or "systemctl error").strip()
-        except Exception as exc:
-            return False, str(exc)
+    def get_version(self) -> Optional[str]:
+        if not self.is_installed():
+            return None
+        ok, out = self._run_cmd([self.mtg_binary, "--version"], timeout=5)
+        if not ok:
+            return None
+        return out.strip() or None
 
-    def _run_cmd(self, cmd: List[str], timeout=10) -> Tuple[bool, str]:
+    def _run_cmd(self, cmd: List[str], timeout: int = 20) -> Tuple[bool, str]:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             if result.returncode == 0:
@@ -49,11 +46,19 @@ class MTGService:
         except Exception as exc:
             return False, str(exc)
 
-    def _instance_toml_path(self, instance_id: str) -> str:
-        return os.path.join(self.instances_dir, f"{instance_id}.toml")
+    def _systemctl(self, action: str, unit: Optional[str] = None) -> Tuple[bool, str]:
+        cmd = ["systemctl", action]
+        if unit:
+            cmd.append(unit)
+        if self.use_sudo:
+            cmd = ["sudo", "-n"] + cmd
+        return self._run_cmd(cmd, timeout=30)
 
     def _instance_unit(self, instance_id: str) -> str:
         return f"mtg@{instance_id}.service"
+
+    def _instance_toml_path(self, instance_id: str) -> str:
+        return os.path.join(self.instances_dir, f"{instance_id}.toml")
 
     def _pick_free_stats_port(self) -> int:
         start = int(Settings.get("instance_stats_port_start", 31000))
@@ -66,14 +71,17 @@ class MTGService:
     def generate_instance_config(self, instance: ProxyInstance) -> str:
         os.makedirs(self.instances_dir, exist_ok=True)
         path = self._instance_toml_path(instance.id)
+
         content = (
             f'secret = "{instance.secret}"\n'
             f'bind-to = "{instance.bind_ip}:{instance.bind_port}"\n\n'
             "[stats.prometheus]\n"
             f'bind-to = "127.0.0.1:{instance.stats_port}"\n'
         )
+
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+
         return path
 
     def create_instance(
@@ -85,8 +93,11 @@ class MTGService:
         owner_user_id: Optional[int] = None,
         notes: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[ProxyInstance]]:
-        if ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=bind_port).first():
-            return False, "Порт уже занят", None
+        bind_ip = (bind_ip or "0.0.0.0").strip()
+
+        exists = ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=int(bind_port)).first()
+        if exists:
+            return False, "Этот bind_ip:bind_port уже занят", None
 
         secret, domain = KeyGenerator.generate_secret(fake_tls_domain)
         stats_port = self._pick_free_stats_port()
@@ -95,7 +106,7 @@ class MTGService:
             name=name.strip(),
             secret=secret,
             fake_tls_domain=domain,
-            bind_ip=bind_ip.strip(),
+            bind_ip=bind_ip,
             bind_port=int(bind_port),
             stats_port=stats_port,
             owner_user_id=owner_user_id if owner_user_id else None,
@@ -107,14 +118,19 @@ class MTGService:
         db.session.commit()
 
         self.generate_instance_config(instance)
-        self._systemctl("daemon-reload", "dummy.target")  # harmless placeholder if sudo wrapper expects unit
+
+        ok_reload, msg_reload = self._systemctl("daemon-reload")
+        if not ok_reload:
+            return False, f"Инстанс создан, но daemon-reload не выполнен: {msg_reload}", instance
+
         self._systemctl("enable", self._instance_unit(instance.id))
-        ok, msg = self._systemctl("start", self._instance_unit(instance.id))
-        if not ok:
-            return False, f"Инстанс создан, но не запущен: {msg}", instance
+        ok_start, msg_start = self._systemctl("start", self._instance_unit(instance.id))
+        if not ok_start:
+            return False, f"Инстанс создан, но не запущен: {msg_start}", instance
+
         return True, "Инстанс создан и запущен", instance
 
-    def update_instance(self, instance: ProxyInstance, regenerate_secret=False) -> Tuple[bool, str]:
+    def update_instance(self, instance: ProxyInstance, regenerate_secret: bool = False) -> Tuple[bool, str]:
         if regenerate_secret:
             secret, domain = KeyGenerator.generate_secret(instance.fake_tls_domain)
             instance.secret = secret
@@ -129,9 +145,9 @@ class MTGService:
         self._systemctl("stop", unit)
         self._systemctl("disable", unit)
 
-        path = self._instance_toml_path(instance.id)
-        if os.path.exists(path):
-            os.remove(path)
+        toml_path = self._instance_toml_path(instance.id)
+        if os.path.exists(toml_path):
+            os.remove(toml_path)
 
         db.session.delete(instance)
         db.session.commit()
@@ -156,22 +172,26 @@ class MTGService:
 
     def instance_status(self, instance_id: str) -> Dict:
         unit = self._instance_unit(instance_id)
-        ok, msg = self._systemctl("is-active", unit)
-        status = "active" if ok else "inactive"
+        ok_active, raw = self._systemctl("is-active", unit)
 
         pid = None
         cmd = ["systemctl", "show", unit, "--property=MainPID"]
         if self.use_sudo:
             cmd = ["sudo", "-n"] + cmd
-        ok2, out = self._run_cmd(cmd)
-        if ok2 and "=" in out:
-            val = out.split("=", 1)[1].strip()
+        ok_pid, out_pid = self._run_cmd(cmd, timeout=10)
+        if ok_pid and "=" in out_pid:
+            val = out_pid.split("=", 1)[1].strip()
             if val.isdigit() and int(val) > 0:
                 pid = int(val)
 
-        return {"unit": unit, "active": status == "active", "pid": pid, "raw": msg}
+        return {
+            "unit": unit,
+            "active": ok_active,
+            "pid": pid,
+            "raw": raw,
+        }
 
-    # Legacy methods for existing admin dashboard buttons.
+    # Compatibility methods for admin dashboard buttons.
     def start(self) -> Tuple[bool, str]:
         failed = []
         for inst in ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all():
@@ -206,23 +226,31 @@ class MTGService:
         return self.restart()
 
     def get_status(self) -> Dict:
-        items = ProxyInstance.query.all()
-        running = 0
-        for i in items:
-            s = self.instance_status(i.id)
-            if s["active"]:
-                running += 1
+        instances = ProxyInstance.query.all()
+        running_count = 0
+
+        for item in instances:
+            if self.instance_status(item.id).get("active"):
+                running_count += 1
+
         return {
             "installed": self.is_installed(),
-            "instances_total": len(items),
-            "instances_running": running,
-            "active_keys": len(items),
+            "version": self.get_version(),
+            "instances_total": len(instances),
+            "instances_running": running_count,
+            "active_keys": len(instances),
             "connections": 0,
+            # Compatibility key for old callers:
+            "running": running_count > 0,
         }
+
+    # Compatibility method for old traffic monitor calls.
+    def get_stats(self) -> Optional[Dict]:
+        return None
 
 
 def check_traffic_limits(app):
-    # В multi-instance это место можно расширить: лимиты на уровне ProxyInstance.
+    # Multi-instance mode: per-instance traffic limits can be implemented separately.
     with app.app_context():
         return
 

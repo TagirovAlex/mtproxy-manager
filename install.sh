@@ -23,6 +23,49 @@ detect_arch() {
   esac
 }
 
+install_mtg_secure() {
+  local arch tmp release_json asset_url checksums_url file_name expected_sha
+
+  arch="$(detect_arch)"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "${tmp}"' EXIT
+
+  release_json="$(curl -fsSL https://api.github.com/repos/9seconds/mtg/releases/latest)"
+  asset_url="$(echo "${release_json}" \
+    | jq -r --arg a "${arch}" '.assets[] | select(.name | test("linux-" + $a + "\\.tar\\.gz$")) | .browser_download_url' \
+    | head -n1)"
+  checksums_url="$(echo "${release_json}" \
+    | jq -r '.assets[] | select(.name | test("sha256|checksums"; "i")) | .browser_download_url' \
+    | head -n1)"
+
+  if [[ -z "${asset_url}" || "${asset_url}" == "null" ]]; then
+    echo "Failed to resolve MTG release asset"
+    exit 1
+  fi
+
+  file_name="$(basename "${asset_url}")"
+  curl -fsSL "${asset_url}" -o "${tmp}/${file_name}"
+
+  expected_sha="${MTG_SHA256:-}"
+  if [[ -z "${expected_sha}" ]]; then
+    if [[ -n "${checksums_url}" && "${checksums_url}" != "null" ]]; then
+      curl -fsSL "${checksums_url}" -o "${tmp}/checksums.txt"
+      expected_sha="$(grep " ${file_name}\$" "${tmp}/checksums.txt" | awk '{print $1}' | head -n1 || true)"
+    fi
+  fi
+
+  if [[ -z "${expected_sha}" ]]; then
+    echo "MTG checksum is not available."
+    echo "Set MTG_SHA256 env var explicitly to continue securely."
+    exit 1
+  fi
+
+  echo "${expected_sha}  ${tmp}/${file_name}" | sha256sum -c -
+
+  tar -xzf "${tmp}/${file_name}" -C "${tmp}"
+  install -m 0755 "$(find "${tmp}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
+}
+
 apt-get update -y
 apt-get install -y git curl jq tar ca-certificates sudo \
   python3 python3-venv python3-pip build-essential pkg-config libssl-dev
@@ -49,20 +92,11 @@ done
 
 [[ -f "${APP_DIR}/.env" ]] || cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
 
-ARCH="$(detect_arch)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "${TMP}"' EXIT
+install_mtg_secure
 
-ASSET_URL="$(curl -fsSL https://api.github.com/repos/9seconds/mtg/releases/latest \
-  | jq -r --arg a "${ARCH}" '.assets[] | select(.name | test("linux-" + $a + "\\.tar\\.gz$")) | .browser_download_url' | head -n1)"
+install -m 0644 "${APP_DIR}/app/deploy/systemd/mtg@.service" /etc/systemd/system/mtg@.service
 
-curl -fsSL "${ASSET_URL}" -o "${TMP}/mtg.tar.gz"
-tar -xzf "${TMP}/mtg.tar.gz" -C "${TMP}"
-install -m 0755 "$(find "${TMP}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
-
-install -m 0644 "${APP_DIR}/deploy/systemd/mtg@.service" /etc/systemd/system/mtg@.service
-
-cat > "/etc/systemd/system/${MANAGER_SERVICE}.service" <<EOF
+cat >"/etc/systemd/system/${MANAGER_SERVICE}.service" <<EOF
 [Unit]
 Description=MTProxy Manager (Gunicorn)
 After=network.target
@@ -87,8 +121,15 @@ ReadWritePaths=${APP_DIR}
 WantedBy=multi-user.target
 EOF
 
-# Разрешаем только управление mtg@*.service без пароля.
-cat > /etc/sudoers.d/mtproxy-systemctl <<'EOF'
+cat >/etc/sudoers.d/mtproxy-systemctl <<'EOF'
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl start mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl stop mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl restart mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl enable mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl disable mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl is-active mtg@*.service
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl show mtg@*.service --property=MainPID
+mtproxy ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
 mtproxy ALL=(root) NOPASSWD: /bin/systemctl start mtg@*.service
 mtproxy ALL=(root) NOPASSWD: /bin/systemctl stop mtg@*.service
 mtproxy ALL=(root) NOPASSWD: /bin/systemctl restart mtg@*.service
@@ -99,6 +140,7 @@ mtproxy ALL=(root) NOPASSWD: /bin/systemctl show mtg@*.service --property=MainPI
 mtproxy ALL=(root) NOPASSWD: /bin/systemctl daemon-reload
 EOF
 chmod 440 /etc/sudoers.d/mtproxy-systemctl
+visudo -cf /etc/sudoers.d/mtproxy-systemctl
 
 chown -R "${APP_USER}:${APP_GROUP}" "${APP_DIR}"
 chmod 640 "${APP_DIR}/.env" || true
@@ -108,5 +150,5 @@ systemctl enable --now "${MANAGER_SERVICE}"
 
 echo "Install complete"
 echo "1) Apply DB migration"
-echo "2) Create instances from UI /keys"
+echo "2) Create instances in /keys"
 echo "3) Check logs: journalctl -u ${MANAGER_SERVICE} -f"

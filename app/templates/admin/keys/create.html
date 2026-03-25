@@ -1,21 +1,74 @@
 {% extends "base.html" %}
+
 {% block title %}Создание инстанса — {{ app_name }}{% endblock %}
 {% block page_title %}Создание инстанса MTG{% endblock %}
 
 {% block content %}
-<form method="POST">
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+  <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">← К списку</a>
+</div>
+
+<form method="POST" style="max-width:820px;margin-top:16px;">
   {{ form.hidden_tag() }}
 
-  <p>{{ form.name.label }}<br>{{ form.name(size=40) }}</p>
-  <p>{{ form.bind_ip.label }}<br>{{ form.bind_ip(size=20) }}</p>
-  <p>{{ form.bind_port.label }}<br>{{ form.bind_port() }}</p>
-  <p>{{ form.fake_tls_domain.label }}<br>{{ form.fake_tls_domain(size=40) }}</p>
+  <div class="card">
+    <div class="card-header"><h3>Основные параметры</h3></div>
+    <div class="card-body">
+      <p>
+        {{ form.name.label }}<br>
+        {{ form.name(class_="form-input", size=48) }}
+        {% for e in form.name.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
 
-  {% if current_user.is_admin %}
-  <p>{{ form.owner_user_id.label }}<br>{{ form.owner_user_id() }}</p>
-  {% endif %}
+      <p>
+        {{ form.bind_ip.label }}<br>
+        {{ form.bind_ip(class_="form-input", size=24) }}
+        {% for e in form.bind_ip.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
 
-  <p>{{ form.notes.label }}<br>{{ form.notes(rows=4, cols=60) }}</p>
-  <p>{{ form.submit(class_="btn btn-primary") }}</p>
+      <p>
+        {{ form.bind_port.label }}<br>
+        {{ form.bind_port(class_="form-input") }}
+        {% for e in form.bind_port.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
+      <p>
+        {{ form.fake_tls_domain.label }}<br>
+        {{ form.fake_tls_domain(class_="form-input", size=48) }}
+        {% for e in form.fake_tls_domain.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
+      {% if current_user.is_admin %}
+      <p>
+        {{ form.owner_user_id.label }}<br>
+        {{ form.owner_user_id(class_="form-select") }}
+        {% for e in form.owner_user_id.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+      {% endif %}
+
+      <p>
+        {{ form.notes.label }}<br>
+        {{ form.notes(class_="form-textarea", rows=4, cols=70) }}
+        {% for e in form.notes.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    {{ form.submit(class_="btn btn-primary") }}
+    <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">Отмена</a>
+  </div>
 </form>
 {% endblock %}
