@@ -32,6 +32,51 @@ class TrafficMonitor:
             value /= 1024
         return f"{value:.2f} ПБ"
 
+    @staticmethod
+    def _parse_prometheus_metrics(text: str) -> Dict[str, int]:
+        out = {"connections": 0, "bytes_in": 0, "bytes_out": 0}
+
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+
+            name, value = parts[0], parts[1]
+            lname = name.lower()
+
+            # Пропускаем histogram buckets/quantiles.
+            if lname.endswith("_bucket") or "quantile=" in lname:
+                continue
+
+            try:
+                num = int(float(value))
+            except Exception:
+                continue
+
+            # connections
+            if "connection" in lname:
+                out["connections"] = max(out["connections"], num)
+
+            # входящий трафик
+            if (
+                ("receive" in lname or "received" in lname or "inbound" in lname or "input" in lname)
+                and ("byte" in lname or "octet" in lname or lname.endswith("_sum") or lname.endswith("_total"))
+            ):
+                out["bytes_in"] = max(out["bytes_in"], num)
+
+            # исходящий трафик
+            if (
+                ("send" in lname or "sent" in lname or "outbound" in lname or "output" in lname)
+                and ("byte" in lname or "octet" in lname or lname.endswith("_sum") or lname.endswith("_total"))
+            ):
+                out["bytes_out"] = max(out["bytes_out"], num)
+
+        return out
+
     def _fetch_instance_metrics(self, stats_port: int) -> Optional[Dict[str, int]]:
         try:
             r = requests.get(f"http://127.0.0.1:{stats_port}/metrics", timeout=3)
@@ -40,31 +85,6 @@ class TrafficMonitor:
             return self._parse_prometheus_metrics(r.text)
         except Exception:
             return None
-
-    @staticmethod
-    def _parse_prometheus_metrics(text: str) -> Dict[str, int]:
-        out = {"connections": 0, "bytes_in": 0, "bytes_out": 0}
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split()
-            if len(parts) < 2:
-                continue
-            name, value = parts[0], parts[1]
-            try:
-                num = int(float(value))
-            except Exception:
-                continue
-
-            # MTG метрики могут иметь суффиксы (_total и т.п.)
-            if name == "mtg_connections":
-                out["connections"] = num
-            elif name.startswith("mtg_bytes_received"):
-                out["bytes_in"] = num
-            elif name.startswith("mtg_bytes_sent"):
-                out["bytes_out"] = num
-        return out
 
     def get_key_stats(self, instance_id: str, period: str = "day") -> Dict:
         inst = ProxyInstance.query.get(instance_id)
