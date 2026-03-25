@@ -1,132 +1,33 @@
 {% extends "base.html" %}
-
 {% block title %}Dashboard — {{ app_name }}{% endblock %}
 {% block page_title %}Панель администратора{% endblock %}
 
 {% block content %}
-<div class="dashboard-grid" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
-
-  <div class="card">
-    <div class="card-header"><h3>MTG</h3></div>
-    <div class="card-body">
-      <p><strong>Установлен:</strong> {{ "Да" if mtg_status.installed else "Нет" }}</p>
-      <p><strong>Версия:</strong> {{ mtg_status.version if mtg_status.version else "—" }}</p>
-      <p><strong>Инстансов всего:</strong> {{ mtg_status.instances_total }}</p>
-      <p><strong>Инстансов запущено:</strong> {{ mtg_status.instances_running }}</p>
-      <p><strong>Есть запущенные:</strong> {{ "Да" if mtg_status.running else "Нет" }}</p>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-        <form method="post" action="{{ url_for('admin.mtg_start') }}">
-          <button class="btn btn-success">Start All</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.mtg_stop') }}">
-          <button class="btn btn-secondary">Stop All</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.mtg_restart') }}">
-          <button class="btn btn-info">Restart All</button>
-        </form>
-        <form method="post" action="{{ url_for('admin.mtg_reload') }}">
-          <button class="btn btn-primary">Reload Config</button>
-        </form>
-      </div>
-    </div>
+<div class="card">
+  <div class="card-header"><h3>MTG</h3></div>
+  <div class="card-body">
+    <p><strong>Установлен:</strong> {{ "Да" if mtg_status.get("installed") else "Нет" }}</p>
+    <p><strong>Инстансов всего:</strong> {{ mtg_status.get("instances_total", 0) }}</p>
+    <p><strong>Инстансов запущено:</strong> {{ mtg_status.get("instances_running", 0) }}</p>
   </div>
+</div>
 
-  <div class="card">
-    <div class="card-header"><h3>Пользователи</h3></div>
-    <div class="card-body">
-      <p><strong>Всего:</strong> {{ users_stats.total }}</p>
-      <p><strong>Подтверждено:</strong> {{ users_stats.approved }}</p>
-      <p><strong>Ожидают:</strong> {{ users_stats.pending }}</p>
-      <p><strong>Заблокированы:</strong> {{ users_stats.blocked }}</p>
-      <p><strong>Администраторы:</strong> {{ users_stats.admins }}</p>
-      <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">Управление пользователями</a>
-    </div>
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Пользователи</h3></div>
+  <div class="card-body">
+    <p>Всего: {{ users_stats.get("total", 0) }}</p>
+    <p>Подтверждено: {{ users_stats.get("approved", 0) }}</p>
+    <p>Ожидают: {{ users_stats.get("pending", 0) }}</p>
+    <p>Заблокированы: {{ users_stats.get("blocked", 0) }}</p>
   </div>
+</div>
 
-  <div class="card">
-    <div class="card-header"><h3>Инстансы</h3></div>
-    <div class="card-body">
-      <p><strong>Всего:</strong> {{ keys_stats.total }}</p>
-      <p><strong>Активные:</strong> {{ keys_stats.active }}</p>
-      <p><strong>Заблокированные:</strong> {{ keys_stats.blocked }}</p>
-      <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">Открыть инстансы</a>
-    </div>
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Инстансы</h3></div>
+  <div class="card-body">
+    <p>Всего: {{ keys_stats.get("total", 0) }}</p>
+    <p>Активные: {{ keys_stats.get("active", 0) }}</p>
+    <p>Заблокированные: {{ keys_stats.get("blocked", 0) }}</p>
   </div>
-
-  <div class="card">
-    <div class="card-header"><h3>Трафик</h3></div>
-    <div class="card-body">
-      <p><strong>Всего:</strong> {{ traffic_stats.total_traffic_formatted }}</p>
-      <p><strong>За текущий период:</strong> {{ traffic_stats.current_period_formatted }}</p>
-      <p><strong>Активных инстансов:</strong> {{ traffic_stats.active_keys }}</p>
-      <p><strong>Последняя активность:</strong> {{ traffic_stats.last_activity if traffic_stats.last_activity else "—" }}</p>
-    </div>
-  </div>
-
-  <div class="card" style="grid-column:1/-1;">
-    <div class="card-header"><h3>Система</h3></div>
-    <div class="card-body" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-      <div>
-        <p><strong>CPU:</strong> {{ system_stats.cpu.percent }}%</p>
-        <p><strong>RAM:</strong> {{ system_stats.memory.used_percent }}%</p>
-        <p><strong>Disk:</strong> {{ system_stats.disk.used_percent }}%</p>
-      </div>
-      <div>
-        <p><strong>Health:</strong> {{ system_health.status if system_health.status else "—" }}</p>
-        {% if system_health.issues %}
-          <p><strong>Issues:</strong> {{ system_health.issues|join(", ") }}</p>
-        {% else %}
-          <p><strong>Issues:</strong> нет</p>
-        {% endif %}
-        {% if system_health.warnings %}
-          <p><strong>Warnings:</strong> {{ system_health.warnings|join(", ") }}</p>
-        {% else %}
-          <p><strong>Warnings:</strong> нет</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="grid-column:1/-1;">
-    <div class="card-header"><h3>Последние попытки входа</h3></div>
-    <div class="card-body">
-      {% if recent_logins %}
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Время</th>
-            <th>Email</th>
-            <th>IP</th>
-            <th>Результат</th>
-            <th>User-Agent</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in recent_logins %}
-          <tr>
-            <td>{{ item.timestamp.strftime('%Y-%m-%d %H:%M:%S') if item.timestamp else '—' }}</td>
-            <td>{{ item.email if item.email else '—' }}</td>
-            <td>{{ item.ip_address }}</td>
-            <td>
-              {% if item.success %}
-                <span class="badge badge-success">Success</span>
-              {% else %}
-                <span class="badge badge-danger">Fail</span>
-              {% endif %}
-            </td>
-            <td style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              {{ item.user_agent if item.user_agent else '—' }}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p>Записей пока нет.</p>
-      {% endif %}
-    </div>
-  </div>
-
 </div>
 {% endblock %}
