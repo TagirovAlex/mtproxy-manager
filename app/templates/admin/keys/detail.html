@@ -4,7 +4,6 @@
 {% block page_title %}Инстанс: {{ key.name }}{% endblock %}
 
 {% block content %}
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">← К списку</a>
   <div style="display:flex;gap:8px;align-items:center;">
@@ -15,6 +14,11 @@
     {% else %}
       <span class="badge badge-secondary">Выключен</span>
     {% endif %}
+
+    {% if key.paused_by_limit %}
+      <span class="badge badge-warning">Остановлен по лимиту</span>
+    {% endif %}
+
     <span class="badge {% if service_status.active %}badge-success{% else %}badge-warning{% endif %}">
       Systemd: {{ "active" if service_status.active else "inactive" }}
     </span>
@@ -31,6 +35,57 @@
     <p><strong>Owner:</strong> {% if key.owner %}{{ key.owner.email }}{% else %}—{% endif %}</p>
     <p><strong>Service unit:</strong> {{ service_status.unit }}</p>
     <p><strong>PID:</strong> {{ service_status.pid if service_status.pid else "—" }}</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Трафик (live)</h3></div>
+  <div class="card-body">
+    <p><strong>Входящий:</strong> {{ traffic_stats.formatted_in if traffic_stats else "0 Б" }}</p>
+    <p><strong>Исходящий:</strong> {{ traffic_stats.formatted_out if traffic_stats else "0 Б" }}</p>
+    <p><strong>Итого:</strong> {{ traffic_stats.formatted_total if traffic_stats else "0 Б" }}</p>
+    <p><strong>Соединения:</strong> {{ traffic_stats.connections if traffic_stats else 0 }}</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Лимит трафика</h3></div>
+  <div class="card-body">
+    {% set limit_bytes = limit_info.limit_bytes if limit_info else None %}
+    {% set used_bytes = limit_info.used_bytes if limit_info else 0 %}
+    {% set period = limit_info.period if limit_info else 'none' %}
+
+    {% if not limit_bytes or period == 'none' %}
+      <p><strong>Режим:</strong> Без лимита</p>
+    {% else %}
+      {% set pct = ((used_bytes / limit_bytes) * 100) if limit_bytes > 0 else 0 %}
+      {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+
+      <p><strong>Период:</strong>
+        {% if period == 'day' %}день
+        {% elif period == 'week' %}неделя
+        {% elif period == 'month' %}месяц
+        {% else %}{{ period }}
+        {% endif %}
+      </p>
+      <p><strong>Использовано:</strong> {{ used_bytes }} байт</p>
+      <p><strong>Лимит:</strong> {{ limit_bytes }} байт</p>
+      <p><strong>Заполнено:</strong> {{ "%.2f"|format(pct) }}%</p>
+
+      <div style="width:100%;background:#eee;border-radius:6px;height:14px;overflow:hidden;">
+        <div
+          style="
+            width: {{ '%.2f'|format(pct) }}%;
+            height:14px;
+            background:{% if pct >= 100 %}#dc3545{% elif pct >= 80 %}#ffc107{% else %}#28a745{% endif %};
+          ">
+        </div>
+      </div>
+
+      {% if key.limit_exceeded_at %}
+        <p style="margin-top:8px;"><strong>Лимит превышен:</strong> {{ key.limit_exceeded_at }}</p>
+      {% endif %}
+    {% endif %}
   </div>
 </div>
 
@@ -63,49 +118,52 @@
     <a class="btn btn-primary" href="{{ url_for('keys.key_edit', key_id=key.id) }}">Edit</a>
 
     <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-success">Start</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
+
     <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-warning">Stop</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
+
     <form method="post" action="{{ url_for('keys.key_restart', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-info">Restart</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_regenerate', key_id=key.id) }}" onsubmit="return confirm('Перегенерировать секрет? Клиентам потребуется новая ссылка.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-secondary">Regenerate Secret</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     {% if current_user.is_admin %}
       {% if key.is_blocked %}
       <form method="post" action="{{ url_for('keys.key_unblock', key_id=key.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn btn-success">Unblock</button>
-		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% else %}
       <form method="post" action="{{ url_for('keys.key_block', key_id=key.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="btn btn-danger">Block</button>
-		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% endif %}
     {% endif %}
 
     <form method="post" action="{{ url_for('keys.key_delete', key_id=key.id) }}" onsubmit="return confirm('Удалить инстанс?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger">Delete</button>
     </form>
   </div>
 </div>
 
 <script>
-  function copyField(id) {
-    const el = document.getElementById(id);
-    el.select();
-    el.setSelectionRange(0, 99999);
-    navigator.clipboard.writeText(el.value);
-  }
+function copyField(id) {
+  const el = document.getElementById(id);
+  el.select();
+  el.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(el.value);
+}
 </script>
 {% endblock %}
