@@ -14,6 +14,12 @@ def _can_access(instance: ProxyInstance) -> bool:
     return current_user.is_admin or (instance.owner_user_id == current_user.id)
 
 
+def _mb_to_bytes(mb_value):
+    if mb_value is None:
+        return None
+    return int(mb_value) * 1024 * 1024
+
+
 @keys_bp.route("/")
 @login_required
 def list_keys():
@@ -68,9 +74,29 @@ def create_key():
             owner_user_id=owner,
             notes=form.notes.data,
         )
-        flash(msg, "success" if ok else "danger")
-        if ok and inst:
-            return redirect(url_for("keys.key_detail", key_id=inst.id))
+
+        if not ok:
+            flash(msg, "danger")
+            return render_template("admin/keys/create.html", form=form)
+
+        # Лимиты сохраняем после создания инстанса
+        period = form.traffic_limit_period.data or "none"
+        if period == "none":
+            inst.traffic_limit_bytes = None
+            inst.traffic_limit_period = "none"
+        else:
+            inst.traffic_limit_period = period
+            inst.traffic_limit_bytes = _mb_to_bytes(form.traffic_limit_mb.data)
+            inst.period_started_at = None
+            inst.period_baseline_bytes = 0
+            inst.period_used_bytes = 0
+            inst.paused_by_limit = False
+            inst.limit_exceeded_at = None
+
+        db.session.commit()
+
+        flash("Инстанс создан и запущен", "success")
+        return redirect(url_for("keys.key_detail", key_id=inst.id))
 
     return render_template("admin/keys/create.html", form=form)
 
@@ -97,6 +123,13 @@ def key_detail(key_id):
     traffic_stats = traffic_monitor.get_key_stats(instance.id, period="day")
     hourly_stats = traffic_monitor.get_hourly_stats(instance.id, hours=24)
 
+    limit_info = {
+        "period": instance.traffic_limit_period or "none",
+        "limit_bytes": instance.traffic_limit_bytes,
+        "used_bytes": instance.period_used_bytes or 0,
+        "paused_by_limit": bool(instance.paused_by_limit),
+    }
+
     return render_template(
         "admin/keys/detail.html",
         key=instance,
@@ -105,6 +138,7 @@ def key_detail(key_id):
         server_domain=server_domain,
         traffic_stats=traffic_stats,
         hourly_stats=hourly_stats,
+        limit_info=limit_info,
     )
 
 
@@ -120,6 +154,12 @@ def key_edit(key_id):
 
     if request.method == "GET":
         form.owner_user_id.data = instance.owner_user_id or 0
+        form.traffic_limit_period.data = instance.traffic_limit_period or "none"
+        form.traffic_limit_mb.data = (
+            int(instance.traffic_limit_bytes / (1024 * 1024))
+            if instance.traffic_limit_bytes
+            else None
+        )
 
     if form.validate_on_submit():
         instance.name = form.name.data.strip()
@@ -130,6 +170,27 @@ def key_edit(key_id):
         instance.is_enabled = form.is_enabled.data
         instance.is_blocked = form.is_blocked.data
         instance.notes = form.notes.data
+
+        period = form.traffic_limit_period.data or "none"
+        if period == "none":
+            instance.traffic_limit_period = "none"
+            instance.traffic_limit_bytes = None
+            instance.period_started_at = None
+            instance.period_baseline_bytes = 0
+            instance.period_used_bytes = 0
+            instance.paused_by_limit = False
+            instance.limit_exceeded_at = None
+        else:
+            instance.traffic_limit_period = period
+            instance.traffic_limit_bytes = _mb_to_bytes(form.traffic_limit_mb.data)
+
+            # При смене лимита/периода — старт нового периода
+            instance.period_started_at = None
+            instance.period_baseline_bytes = instance.total_traffic or 0
+            instance.period_used_bytes = 0
+            instance.paused_by_limit = False
+            instance.limit_exceeded_at = None
+
         db.session.commit()
 
         ok, msg = get_mtg_service().update_instance(instance, regenerate_secret=False)

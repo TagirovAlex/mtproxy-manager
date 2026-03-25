@@ -67,6 +67,19 @@ class CreateKeyForm(FlaskForm):
     bind_ip = StringField("IP", validators=[DataRequired(), Length(min=3, max=64)], default="0.0.0.0")
     fake_tls_domain = StringField("Домен FakeTLS", validators=[DataRequired(), Length(min=3, max=255)])
     owner_user_id = SelectField("Пользователь", coerce=int, validators=[Optional()])
+
+    traffic_limit_period = SelectField(
+        "Период лимита",
+        choices=[
+            ("none", "Без лимита"),
+            ("day", "День"),
+            ("week", "Неделя"),
+            ("month", "Месяц"),
+        ],
+        default="none",
+    )
+    traffic_limit_mb = IntegerField("Лимит (МБ)", validators=[Optional(), NumberRange(min=1, max=10_000_000)])
+
     notes = TextAreaField("Заметки", validators=[Optional(), Length(max=1000)])
     submit = SubmitField("Создать инстанс")
 
@@ -80,6 +93,11 @@ class CreateKeyForm(FlaskForm):
         if ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=field.data).first():
             raise ValidationError("Этот IP:порт уже занят другим инстансом")
 
+    def validate_traffic_limit_mb(self, field):
+        period = self.traffic_limit_period.data
+        if period != "none" and not field.data:
+            raise ValidationError("Укажите лимит в МБ для выбранного периода")
+
 
 class EditKeyForm(FlaskForm):
     name = StringField("Название инстанса", validators=[DataRequired(), Length(min=1, max=100)])
@@ -89,6 +107,19 @@ class EditKeyForm(FlaskForm):
     owner_user_id = SelectField("Пользователь", coerce=int, validators=[Optional()])
     is_enabled = BooleanField("Включен")
     is_blocked = BooleanField("Заблокирован")
+
+    traffic_limit_period = SelectField(
+        "Период лимита",
+        choices=[
+            ("none", "Без лимита"),
+            ("day", "День"),
+            ("week", "Неделя"),
+            ("month", "Месяц"),
+        ],
+        default="none",
+    )
+    traffic_limit_mb = IntegerField("Лимит (МБ)", validators=[Optional(), NumberRange(min=1, max=10_000_000)])
+
     notes = TextAreaField("Заметки", validators=[Optional(), Length(max=1000)])
     submit = SubmitField("Сохранить")
 
@@ -105,6 +136,11 @@ class EditKeyForm(FlaskForm):
             query = query.filter(ProxyInstance.id != self.instance_id)
         if query.first():
             raise ValidationError("Этот IP:порт уже занят другим инстансом")
+
+    def validate_traffic_limit_mb(self, field):
+        period = self.traffic_limit_period.data
+        if period != "none" and not field.data:
+            raise ValidationError("Укажите лимит в МБ для выбранного периода")
 
 
 class UserManageForm(FlaskForm):

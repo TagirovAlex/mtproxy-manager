@@ -34,23 +34,17 @@ class TrafficMonitor:
 
     @staticmethod
     def _parse_metric_with_labels(raw_name: str):
-        """
-        mtg_telegram_traffic{direction="from_client",dc="2"} -> ("mtg_telegram_traffic", {"direction":"from_client","dc":"2"})
-        """
         if "{" not in raw_name:
             return raw_name, {}
-
         metric = raw_name.split("{", 1)[0]
         labels_part = raw_name.split("{", 1)[1].rsplit("}", 1)[0]
         labels = {}
-
         for part in labels_part.split(","):
             part = part.strip()
             if "=" not in part:
                 continue
             k, v = part.split("=", 1)
             labels[k.strip()] = v.strip().strip('"')
-
         return metric, labels
 
     @classmethod
@@ -75,22 +69,15 @@ class TrafficMonitor:
             except Exception:
                 continue
 
-            # 1) Клиентские соединения
             if metric_l == "mtg_client_connections":
                 out["connections"] += val
                 continue
 
-            # 2) Трафик Telegram<->клиент
-            # mtg_telegram_traffic{direction="from_client"| "to_client", ...}
             if metric_l == "mtg_telegram_traffic":
                 direction = (labels.get("direction") or "").lower()
-
-                # from_client = клиент -> прокси -> telegram (входящий для нашего прокси)
                 if direction == "from_client":
                     out["bytes_in"] += val
                     continue
-
-                # to_client = telegram -> прокси -> клиент (исходящий для нашего прокси)
                 if direction == "to_client":
                     out["bytes_out"] += val
                     continue
@@ -168,8 +155,9 @@ class TrafficMonitor:
 
     def update_instance_counters(self) -> int:
         updated = 0
-        items = ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all()
+        now = datetime.utcnow()
 
+        items = ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all()
         for inst in items:
             metrics = self._fetch_instance_metrics(inst.stats_port)
             if not metrics:
@@ -178,7 +166,27 @@ class TrafficMonitor:
             total = metrics["bytes_in"] + metrics["bytes_out"]
             inst.total_traffic = total
             inst.connection_count = metrics["connections"]
-            inst.last_activity = datetime.utcnow()
+            inst.last_activity = now
+
+            period_reset = inst.reset_limit_period_if_needed(current_total=total, now=now)
+            inst.update_period_usage(current_total=total)
+
+            # Если начался новый период и был paused по лимиту -> запускаем снова
+            if period_reset and inst.paused_by_limit and inst.is_enabled and not inst.is_blocked:
+                from app.services.mtg_service import get_mtg_service
+                ok, _ = get_mtg_service().start_instance(inst.id)
+                if ok:
+                    inst.paused_by_limit = False
+                    inst.limit_exceeded_at = None
+
+            # Проверяем превышение
+            if inst.is_limit_exceeded() and not inst.paused_by_limit and inst.is_enabled and not inst.is_blocked:
+                from app.services.mtg_service import get_mtg_service
+                ok, _ = get_mtg_service().stop_instance(inst.id)
+                if ok:
+                    inst.paused_by_limit = True
+                    inst.limit_exceeded_at = now
+
             updated += 1
 
         if updated:

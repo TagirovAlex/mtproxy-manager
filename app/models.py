@@ -183,6 +183,17 @@ class ProxyInstance(db.Model):
     connection_count = db.Column(db.Integer, default=0)
     last_activity = db.Column(db.DateTime, nullable=True)
 
+    # Лимиты для multi-instance
+    traffic_limit_bytes = db.Column(db.BigInteger, nullable=True)  # None = без лимита
+    traffic_limit_period = db.Column(db.String(10), default="none")  # none/day/week/month
+
+    period_started_at = db.Column(db.DateTime, nullable=True)
+    period_baseline_bytes = db.Column(db.BigInteger, default=0)
+    period_used_bytes = db.Column(db.BigInteger, default=0)
+
+    paused_by_limit = db.Column(db.Boolean, default=False)
+    limit_exceeded_at = db.Column(db.DateTime, nullable=True)
+
     notes = db.Column(db.Text, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -198,6 +209,8 @@ class ProxyInstance(db.Model):
             return "Заблокирован"
         if not self.is_enabled:
             return "Отключен"
+        if self.paused_by_limit:
+            return "Остановлен по лимиту"
         return "Активен"
 
     def get_tg_link(self, server_host):
@@ -205,6 +218,58 @@ class ProxyInstance(db.Model):
 
     def get_https_link(self, server_host):
         return f"https://t.me/proxy?server={server_host}&port={self.bind_port}&secret={self.secret}"
+
+    def _period_seconds(self):
+        if self.traffic_limit_period == "day":
+            return 86400
+        if self.traffic_limit_period == "week":
+            return 7 * 86400
+        if self.traffic_limit_period == "month":
+            return 30 * 86400
+        return None
+
+    def reset_limit_period_if_needed(self, current_total: int, now: datetime) -> bool:
+        if not self.traffic_limit_bytes or self.traffic_limit_period == "none":
+            self.period_started_at = None
+            self.period_baseline_bytes = 0
+            self.period_used_bytes = 0
+            self.limit_exceeded_at = None
+            return False
+
+        sec = self._period_seconds()
+        if not sec:
+            return False
+
+        if self.period_started_at is None:
+            self.period_started_at = now
+            self.period_baseline_bytes = current_total
+            self.period_used_bytes = 0
+            return False
+
+        elapsed = (now - self.period_started_at).total_seconds()
+        if elapsed >= sec:
+            self.period_started_at = now
+            self.period_baseline_bytes = current_total
+            self.period_used_bytes = 0
+            self.limit_exceeded_at = None
+            return True
+
+        return False
+
+    def update_period_usage(self, current_total: int):
+        if not self.traffic_limit_bytes or self.traffic_limit_period == "none":
+            self.period_used_bytes = 0
+            return
+        used = current_total - (self.period_baseline_bytes or 0)
+        if used < 0:
+            self.period_baseline_bytes = current_total
+            used = 0
+        self.period_used_bytes = used
+
+    def is_limit_exceeded(self) -> bool:
+        if not self.traffic_limit_bytes or self.traffic_limit_period == "none":
+            return False
+        return (self.period_used_bytes or 0) >= self.traffic_limit_bytes
 
 
 class TrafficLog(db.Model):
