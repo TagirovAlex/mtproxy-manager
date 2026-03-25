@@ -79,13 +79,16 @@ class MTGService:
             f'secret = "{instance.secret}"\n'
             f'bind-to = "{instance.bind_ip}:{instance.bind_port}"\n\n'
             "[stats.prometheus]\n"
+            "enabled = true\n"
             f'bind-to = "127.0.0.1:{instance.stats_port}"\n'
+            'http-path = "/metrics"\n'
+            'metric-prefix = "mtg"\n'
         )
 
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
 
-        return path
+    return path
 
     def create_instance(
         self,
