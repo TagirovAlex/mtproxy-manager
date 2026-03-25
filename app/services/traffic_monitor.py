@@ -36,6 +36,62 @@ class TrafficMonitor:
     def _parse_prometheus_metrics(text: str) -> Dict[str, int]:
         out = {"connections": 0, "bytes_in": 0, "bytes_out": 0}
 
+        def parse_labels(raw_name: str):
+            # metric{a="b",c="d"} -> ("metric", {"a":"b","c":"d"})
+            if "{" not in raw_name:
+                return raw_name, {}
+            metric = raw_name.split("{", 1)[0]
+            labels_str = raw_name.split("{", 1)[1].rsplit("}", 1)[0]
+            labels = {}
+            for part in labels_str.split(","):
+                part = part.strip()
+                if "=" not in part:
+                    continue
+                k, v = part.split("=", 1)
+                labels[k.strip()] = v.strip().strip('"')
+            return metric, labels
+
+        def direction_from(metric_l: str, labels: dict) -> str:
+            """
+            Возвращает:
+            - "in"  для входящего трафика
+            - "out" для исходящего
+            - ""    если направление не определено
+            """
+            label_blob = " ".join([f"{k}={v}" for k, v in labels.items()]).lower()
+            blob = f"{metric_l} {label_blob}"
+
+            in_markers = [
+                "in",
+                "inbound",
+                "received",
+                "recv",
+                "download",
+                "client_to_proxy",
+                "from_client",
+                "to_server",
+                "server_in",
+                "rx",
+            ]
+            out_markers = [
+                "out",
+                "outbound",
+                "sent",
+                "send",
+                "upload",
+                "proxy_to_client",
+                "to_client",
+                "from_server",
+                "server_out",
+                "tx",
+            ]
+
+            if any(x in blob for x in in_markers):
+                return "in"
+            if any(x in blob for x in out_markers):
+                return "out"
+            return ""
+
         for line in text.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
@@ -45,35 +101,47 @@ class TrafficMonitor:
             if len(parts) < 2:
                 continue
 
-            name, value = parts[0], parts[1]
-            lname = name.lower()
-
-            # Пропускаем histogram buckets/quantiles.
-            if lname.endswith("_bucket") or "quantile=" in lname:
-                continue
+            raw_name, raw_val = parts[0], parts[1]
 
             try:
-                num = int(float(value))
+                num = int(float(raw_val))
             except Exception:
                 continue
 
+            metric_name, labels = parse_labels(raw_name)
+            m = metric_name.lower()
+
+            # Пропускаем гистограммные bucket/quantile
+            if m.endswith("_bucket") or "quantile" in raw_name.lower():
+                continue
+
             # connections
-            if "connection" in lname:
+            if "connection" in m:
                 out["connections"] = max(out["connections"], num)
+                continue
 
-            # входящий трафик
-            if (
-                ("receive" in lname or "received" in lname or "inbound" in lname or "input" in lname)
-                and ("byte" in lname or "octet" in lname or lname.endswith("_sum") or lname.endswith("_total"))
+            # Явные byte counters
+            if ("byte" in m or "octet" in m) and (
+                m.endswith("_total") or m.endswith("_sum") or "bytes" in m
             ):
-                out["bytes_in"] = max(out["bytes_in"], num)
+                d = direction_from(m, labels)
+                if d == "in":
+                    out["bytes_in"] = max(out["bytes_in"], num)
+                    continue
+                if d == "out":
+                    out["bytes_out"] = max(out["bytes_out"], num)
+                    continue
 
-            # исходящий трафик
-            if (
-                ("send" in lname or "sent" in lname or "outbound" in lname or "output" in lname)
-                and ("byte" in lname or "octet" in lname or lname.endswith("_sum") or lname.endswith("_total"))
-            ):
-                out["bytes_out"] = max(out["bytes_out"], num)
+            # Метрики размера пакетов (частый формат у mtg)
+            # Например: ...packet...size..._sum
+            if "packet" in m and "size" in m and (m.endswith("_sum") or m.endswith("_total")):
+                d = direction_from(m, labels)
+                if d == "in":
+                    out["bytes_in"] = max(out["bytes_in"], num)
+                    continue
+                if d == "out":
+                    out["bytes_out"] = max(out["bytes_out"], num)
+                    continue
 
         return out
 
@@ -154,6 +222,7 @@ class TrafficMonitor:
         """
         updated = 0
         items = ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all()
+
         for inst in items:
             metrics = self._fetch_instance_metrics(inst.stats_port)
             if not metrics:
