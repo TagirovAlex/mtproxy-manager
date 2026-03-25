@@ -5,6 +5,7 @@ from app import db
 from app.models import ProxyInstance, Settings
 from app.forms import CreateKeyForm, EditKeyForm
 from app.services.mtg_service import get_mtg_service
+from app.services.traffic_monitor import TrafficMonitor
 
 keys_bp = Blueprint("keys", __name__)
 
@@ -88,7 +89,13 @@ def key_detail(key_id):
         "https": instance.get_https_link(server_domain),
         "tme": instance.get_https_link(server_domain).replace("https://", ""),
     }
-    service_status = get_mtg_service().instance_status(instance.id)
+
+    mtg_service = get_mtg_service()
+    service_status = mtg_service.instance_status(instance.id)
+
+    traffic_monitor = TrafficMonitor()
+    traffic_stats = traffic_monitor.get_key_stats(instance.id, period="day")
+    hourly_stats = traffic_monitor.get_hourly_stats(instance.id, hours=24)
 
     return render_template(
         "admin/keys/detail.html",
@@ -96,6 +103,8 @@ def key_detail(key_id):
         links=links,
         service_status=service_status,
         server_domain=server_domain,
+        traffic_stats=traffic_stats,
+        hourly_stats=hourly_stats,
     )
 
 
