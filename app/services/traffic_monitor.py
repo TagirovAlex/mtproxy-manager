@@ -33,64 +33,29 @@ class TrafficMonitor:
         return f"{value:.2f} ПБ"
 
     @staticmethod
-    def _parse_prometheus_metrics(text: str) -> Dict[str, int]:
+    def _parse_metric_with_labels(raw_name: str):
+        """
+        mtg_telegram_traffic{direction="from_client",dc="2"} -> ("mtg_telegram_traffic", {"direction":"from_client","dc":"2"})
+        """
+        if "{" not in raw_name:
+            return raw_name, {}
+
+        metric = raw_name.split("{", 1)[0]
+        labels_part = raw_name.split("{", 1)[1].rsplit("}", 1)[0]
+        labels = {}
+
+        for part in labels_part.split(","):
+            part = part.strip()
+            if "=" not in part:
+                continue
+            k, v = part.split("=", 1)
+            labels[k.strip()] = v.strip().strip('"')
+
+        return metric, labels
+
+    @classmethod
+    def _parse_prometheus_metrics(cls, text: str) -> Dict[str, int]:
         out = {"connections": 0, "bytes_in": 0, "bytes_out": 0}
-
-        def parse_labels(raw_name: str):
-            # metric{a="b",c="d"} -> ("metric", {"a":"b","c":"d"})
-            if "{" not in raw_name:
-                return raw_name, {}
-            metric = raw_name.split("{", 1)[0]
-            labels_str = raw_name.split("{", 1)[1].rsplit("}", 1)[0]
-            labels = {}
-            for part in labels_str.split(","):
-                part = part.strip()
-                if "=" not in part:
-                    continue
-                k, v = part.split("=", 1)
-                labels[k.strip()] = v.strip().strip('"')
-            return metric, labels
-
-        def direction_from(metric_l: str, labels: dict) -> str:
-            """
-            Возвращает:
-            - "in"  для входящего трафика
-            - "out" для исходящего
-            - ""    если направление не определено
-            """
-            label_blob = " ".join([f"{k}={v}" for k, v in labels.items()]).lower()
-            blob = f"{metric_l} {label_blob}"
-
-            in_markers = [
-                "in",
-                "inbound",
-                "received",
-                "recv",
-                "download",
-                "client_to_proxy",
-                "from_client",
-                "to_server",
-                "server_in",
-                "rx",
-            ]
-            out_markers = [
-                "out",
-                "outbound",
-                "sent",
-                "send",
-                "upload",
-                "proxy_to_client",
-                "to_client",
-                "from_server",
-                "server_out",
-                "tx",
-            ]
-
-            if any(x in blob for x in in_markers):
-                return "in"
-            if any(x in blob for x in out_markers):
-                return "out"
-            return ""
 
         for line in text.splitlines():
             line = line.strip()
@@ -102,45 +67,32 @@ class TrafficMonitor:
                 continue
 
             raw_name, raw_val = parts[0], parts[1]
+            metric_name, labels = cls._parse_metric_with_labels(raw_name)
+            metric_l = metric_name.lower()
 
             try:
-                num = int(float(raw_val))
+                val = int(float(raw_val))
             except Exception:
                 continue
 
-            metric_name, labels = parse_labels(raw_name)
-            m = metric_name.lower()
-
-            # Пропускаем гистограммные bucket/quantile
-            if m.endswith("_bucket") or "quantile" in raw_name.lower():
+            # 1) Клиентские соединения
+            if metric_l == "mtg_client_connections":
+                out["connections"] += val
                 continue
 
-            # connections
-            if "connection" in m:
-                out["connections"] = max(out["connections"], num)
-                continue
+            # 2) Трафик Telegram<->клиент
+            # mtg_telegram_traffic{direction="from_client"| "to_client", ...}
+            if metric_l == "mtg_telegram_traffic":
+                direction = (labels.get("direction") or "").lower()
 
-            # Явные byte counters
-            if ("byte" in m or "octet" in m) and (
-                m.endswith("_total") or m.endswith("_sum") or "bytes" in m
-            ):
-                d = direction_from(m, labels)
-                if d == "in":
-                    out["bytes_in"] = max(out["bytes_in"], num)
-                    continue
-                if d == "out":
-                    out["bytes_out"] = max(out["bytes_out"], num)
+                # from_client = клиент -> прокси -> telegram (входящий для нашего прокси)
+                if direction == "from_client":
+                    out["bytes_in"] += val
                     continue
 
-            # Метрики размера пакетов (частый формат у mtg)
-            # Например: ...packet...size..._sum
-            if "packet" in m and "size" in m and (m.endswith("_sum") or m.endswith("_total")):
-                d = direction_from(m, labels)
-                if d == "in":
-                    out["bytes_in"] = max(out["bytes_in"], num)
-                    continue
-                if d == "out":
-                    out["bytes_out"] = max(out["bytes_out"], num)
+                # to_client = telegram -> прокси -> клиент (исходящий для нашего прокси)
+                if direction == "to_client":
+                    out["bytes_out"] += val
                     continue
 
         return out
@@ -180,7 +132,6 @@ class TrafficMonitor:
         return [self.get_key_stats(i.id, period=period) for i in items]
 
     def get_hourly_stats(self, instance_id: str, hours: int = 24) -> List[Dict]:
-        # История почасово не хранится (пока). Возвращаем пустой список для совместимости UI.
         return []
 
     def get_daily_stats(self, instance_id: str, days: int = 30) -> List[Dict]:
@@ -216,10 +167,6 @@ class TrafficMonitor:
         }
 
     def update_instance_counters(self) -> int:
-        """
-        Обновляет кеш-поля в ProxyInstance (total_traffic, connection_count, last_activity)
-        из live метрик MTG.
-        """
         updated = 0
         items = ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all()
 
@@ -227,6 +174,7 @@ class TrafficMonitor:
             metrics = self._fetch_instance_metrics(inst.stats_port)
             if not metrics:
                 continue
+
             total = metrics["bytes_in"] + metrics["bytes_out"]
             inst.total_traffic = total
             inst.connection_count = metrics["connections"]
@@ -238,7 +186,6 @@ class TrafficMonitor:
         return updated
 
     def cleanup_old_logs(self, days: int = 90):
-        # Нет отдельной таблицы history в этом минимальном варианте.
         return 0
 
 
