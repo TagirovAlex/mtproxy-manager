@@ -9,9 +9,9 @@ from app.services.backup_service import BackupService
 from app.services.system_monitor import SystemMonitor
 
 __all__ = [
-    'KeyGenerator',
-    'MTGService', 
-    'TrafficMonitor',
-    'BackupService',
-    'SystemMonitor'
+    "KeyGenerator",
+    "MTGService",
+    "TrafficMonitor",
+    "BackupService",
+    "SystemMonitor",
 ]

@@ -39,7 +39,7 @@ def index():
     
     form = BackupForm()
     
-    return render_template('backup/index.html',
+    return render_template('admin/backup/index.html',
         backups=backups,
         settings=settings,
         form=form
@@ -138,7 +138,7 @@ def info(backup_id):
         flash('Бэкап не найден', 'danger')
         return redirect(url_for('backup.index'))
     
-    return render_template('backup/info.html', backup=backup_info)
+    return render_template('admin/backup/info.html', backup=backup_info)
 
 
 @backup_bp.route('/settings', methods=['POST'])

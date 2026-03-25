@@ -219,7 +219,7 @@ def result(script_id):
         return redirect(url_for('scripts.index'))
     
     result = script_results[script_id]
-    return render_template('admin/script_result.html', 
+    return render_template('admin/scripts_result.html', 
         script_id=script_id,
         result=result
     )

@@ -45,7 +45,7 @@ def list_keys():
     server_domain = Settings.get('server_domain', 'localhost')
     mtg_port = Settings.get('mtg_port', 443)
     
-    return render_template('keys/list.html', 
+    return render_template('admin/keys/list.html', 
         keys=keys,
         status_filter=status_filter,
         server_domain=server_domain,
@@ -91,7 +91,7 @@ def create_key():
         flash(f'Ключ "{key.name}" успешно создан', 'success')
         return redirect(url_for('keys.key_detail', key_id=key.id))
     
-    return render_template('keys/create.html', form=form)
+    return render_template('admin/keys/create.html', form=form)
 
 
 @keys_bp.route('/<int:key_id>')
@@ -123,7 +123,7 @@ def key_detail(key_id):
     # Владелец ключа
     owner = User.query.get(key.user_id) if key.user_id else None
     
-    return render_template('keys/detail.html',
+    return render_template('admin/keys/detail.html',
         key=key,
         links=links,
         secret_info=secret_info,
@@ -213,7 +213,7 @@ def key_edit(key_id):
         flash('Ключ обновлён', 'success')
         return redirect(url_for('keys.key_detail', key_id=key.id))
     
-    return render_template('keys/edit.html', form=form, key=key)
+    return render_template('admin/keys/edit.html', form=form, key=key)
 
 
 @keys_bp.route('/<int:key_id>/regenerate', methods=['POST'])

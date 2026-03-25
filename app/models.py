@@ -77,7 +77,7 @@ class ProxyKey(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    secret = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    secret = db.Column(db.String(256), unique=True, nullable=False, index=True)
     fake_tls_domain = db.Column(db.String(255), default='www.google.com')
     
     # Привязка к пользователю

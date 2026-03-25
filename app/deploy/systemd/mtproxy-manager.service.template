@@ -1,0 +1,22 @@
+[Unit]
+Description=MTProxy Manager (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User={{APP_USER}}
+Group={{APP_GROUP}}
+WorkingDirectory={{APP_DIR}}
+EnvironmentFile={{APP_DIR}}/.env
+Environment=FLASK_CONFIG=production
+ExecStart={{VENV_DIR}}/bin/gunicorn -w {{GUNICORN_WORKERS}} -b {{MANAGER_BIND}} run:app
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths={{APP_DIR}}
+
+[Install]
+WantedBy=multi-user.target

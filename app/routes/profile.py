@@ -26,7 +26,7 @@ def edit():
         if form.new_password.data:
             if not current_user.check_password(form.current_password.data):
                 flash('Неверный текущий пароль', 'danger')
-                return render_template('profile/edit.html', form=form)
+                return render_template('admin/profile/edit.html', form=form)
             
             current_user.set_password(form.new_password.data)
             flash('Пароль успешно изменён', 'success')
@@ -37,7 +37,7 @@ def edit():
             # Проверяем уникальность
             if User.query.filter_by(email=new_email).first():
                 flash('Этот email уже используется', 'danger')
-                return render_template('profile/edit.html', form=form)
+                return render_template('admin/profile/edit.html', form=form)
             
             current_user.email = new_email
             flash('Email успешно изменён', 'success')
@@ -68,7 +68,7 @@ def edit():
         email=current_user.email
     ).order_by(LoginAttempt.timestamp.desc()).limit(5).all()
     
-    return render_template('profile/edit.html', 
+    return render_template('admin/profile/edit.html', 
         form=form, 
         user_stats=user_stats,
         recent_logins=recent_logins
@@ -87,7 +87,7 @@ def my_keys():
     server_domain = Settings.get('server_domain', 'localhost')
     mtg_port = Settings.get('mtg_port', 443)
     
-    return render_template('profile/my_keys.html', 
+    return render_template('admin/profile/my_keys.html', 
         keys=keys,
         server_domain=server_domain,
         mtg_port=mtg_port
@@ -107,7 +107,7 @@ def sessions():
         page=page, per_page=per_page, error_out=False
     )
     
-    return render_template('profile/sessions.html', attempts=attempts)
+    return render_template('admin/profile/sessions.html', attempts=attempts)
 
 
 def format_bytes(bytes_count):

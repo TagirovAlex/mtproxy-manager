@@ -180,7 +180,7 @@ def settings():
         except Exception as e:
             flash(f'Ошибка сохранения настроек: {str(e)}', 'danger')
     
-    return render_template('admin/settings.html', form=form)
+    return render_template('admin/setting.html', form=form)
 
 
 @admin_bp.route('/users')
