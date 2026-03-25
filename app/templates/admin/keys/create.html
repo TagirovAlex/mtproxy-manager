@@ -8,7 +8,7 @@
   <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">← К списку</a>
 </div>
 
-<form method="POST" style="max-width:820px;margin-top:16px;">
+<form method="POST" style="max-width:860px;margin-top:16px;">
   {{ form.hidden_tag() }}
 
   <div class="card">
@@ -55,7 +55,34 @@
         {% endfor %}
       </p>
       {% endif %}
+    </div>
+  </div>
 
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Лимиты трафика</h3></div>
+    <div class="card-body">
+      <p>
+        {{ form.traffic_limit_period.label }}<br>
+        {{ form.traffic_limit_period(class_="form-select", id="limit_period") }}
+        {% for e in form.traffic_limit_period.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
+      <p id="limit_mb_block">
+        {{ form.traffic_limit_mb.label }}<br>
+        {{ form.traffic_limit_mb(class_="form-input", id="limit_mb") }}
+        <small style="display:block;color:#666;">Укажите размер лимита в мегабайтах.</small>
+        {% for e in form.traffic_limit_mb.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Дополнительно</h3></div>
+    <div class="card-body">
       <p>
         {{ form.notes.label }}<br>
         {{ form.notes(class_="form-textarea", rows=4, cols=70) }}
@@ -71,4 +98,21 @@
     <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">Отмена</a>
   </div>
 </form>
+
+<script>
+  function toggleLimitInput() {
+    const period = document.getElementById("limit_period").value;
+    const block = document.getElementById("limit_mb_block");
+    const input = document.getElementById("limit_mb");
+    if (period === "none") {
+      block.style.display = "none";
+      input.value = "";
+    } else {
+      block.style.display = "block";
+    }
+  }
+
+  document.getElementById("limit_period").addEventListener("change", toggleLimitInput);
+  toggleLimitInput();
+</script>
 {% endblock %}

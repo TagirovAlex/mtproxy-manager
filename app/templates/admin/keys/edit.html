@@ -4,14 +4,12 @@
 {% block page_title %}Редактирование: {{ key.name }}{% endblock %}
 
 {% block content %}
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" class="btn btn-secondary">← К инстансу</a>
 </div>
 
-<form method="POST" style="max-width:860px;margin-top:16px;">
+<form method="POST" style="max-width:900px;margin-top:16px;">
   {{ form.hidden_tag() }}
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="card">
     <div class="card-header"><h3>Параметры инстанса</h3></div>
@@ -60,13 +58,44 @@
         {% endfor %}
       </p>
 
+      <p>{{ form.is_enabled() }} {{ form.is_enabled.label }}</p>
+      <p>{{ form.is_blocked() }} {{ form.is_blocked.label }}</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Лимиты трафика</h3></div>
+    <div class="card-body">
       <p>
-        {{ form.is_enabled() }} {{ form.is_enabled.label }}
-      </p>
-      <p>
-        {{ form.is_blocked() }} {{ form.is_blocked.label }}
+        {{ form.traffic_limit_period.label }}<br>
+        {{ form.traffic_limit_period(class_="form-select", id="limit_period") }}
+        {% for e in form.traffic_limit_period.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
       </p>
 
+      <p id="limit_mb_block">
+        {{ form.traffic_limit_mb.label }}<br>
+        {{ form.traffic_limit_mb(class_="form-input", id="limit_mb") }}
+        <small style="display:block;color:#666;">
+          Если выбран период (день/неделя/месяц), укажите лимит в МБ.
+        </small>
+        {% for e in form.traffic_limit_mb.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
+      <hr>
+      <p><strong>Использовано в периоде:</strong> {{ key.period_used_bytes if key.period_used_bytes else 0 }} байт</p>
+      <p><strong>Лимит:</strong> {{ key.traffic_limit_bytes if key.traffic_limit_bytes else "без лимита" }}</p>
+      <p><strong>Старт периода:</strong> {{ key.period_started_at if key.period_started_at else "—" }}</p>
+      <p><strong>Остановлен по лимиту:</strong> {{ "Да" if key.paused_by_limit else "Нет" }}</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header"><h3>Дополнительно</h3></div>
+    <div class="card-body">
       <p>
         {{ form.notes.label }}<br>
         {{ form.notes(class_="form-textarea", rows=4, cols=70) }}
@@ -87,29 +116,46 @@
   <div class="card-header"><h3>Управление инстансом</h3></div>
   <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
     <form method="post" action="{{ url_for('keys.key_regenerate', key_id=key.id) }}" onsubmit="return confirm('Перегенерировать секрет? Клиентам потребуется новая ссылка.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-warning">Regenerate Secret</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-success">Start</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-secondary">Stop</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_restart', key_id=key.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-info">Restart</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_delete', key_id=key.id) }}" onsubmit="return confirm('Удалить инстанс?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn-danger">Delete</button>
-	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
   </div>
 </div>
+
+<script>
+  function toggleLimitInput() {
+    const period = document.getElementById("limit_period").value;
+    const block = document.getElementById("limit_mb_block");
+    const input = document.getElementById("limit_mb");
+    if (period === "none") {
+      block.style.display = "none";
+      input.value = "";
+    } else {
+      block.style.display = "block";
+    }
+  }
+
+  document.getElementById("limit_period").addEventListener("change", toggleLimitInput);
+  toggleLimitInput();
+</script>
 {% endblock %}
