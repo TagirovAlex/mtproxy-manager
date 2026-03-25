@@ -45,9 +45,11 @@
 
         <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
           <button class="btn btn-sm btn-success">Start</button>
+		  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         </form>
         <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
           <button class="btn btn-sm btn-warning">Stop</button>
+		  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         </form>
       </td>
     </tr>

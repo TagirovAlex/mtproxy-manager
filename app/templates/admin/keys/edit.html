@@ -11,6 +11,7 @@
 
 <form method="POST" style="max-width:860px;margin-top:16px;">
   {{ form.hidden_tag() }}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="card">
     <div class="card-header"><h3>Параметры инстанса</h3></div>
@@ -87,22 +88,27 @@
   <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap;">
     <form method="post" action="{{ url_for('keys.key_regenerate', key_id=key.id) }}" onsubmit="return confirm('Перегенерировать секрет? Клиентам потребуется новая ссылка.');">
       <button class="btn btn-warning">Regenerate Secret</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_start', key_id=key.id) }}">
       <button class="btn btn-success">Start</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_stop', key_id=key.id) }}">
       <button class="btn btn-secondary">Stop</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_restart', key_id=key.id) }}">
       <button class="btn btn-info">Restart</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
 
     <form method="post" action="{{ url_for('keys.key_delete', key_id=key.id) }}" onsubmit="return confirm('Удалить инстанс?');">
       <button class="btn btn-danger">Delete</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
   </div>
 </div>

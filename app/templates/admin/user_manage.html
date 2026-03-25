@@ -37,6 +37,7 @@
   <div class="card-body">
     <form method="POST" action="{{ url_for('admin.user_manage', user_id=user.id) }}">
       {{ form.hidden_tag() }}
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <p>{{ form.is_approved() }} {{ form.is_approved.label }}</p>
       <p>{{ form.is_admin() }} {{ form.is_admin.label }}</p>
@@ -49,22 +50,26 @@
       {% if not user.is_approved and not user.is_blocked %}
       <form method="POST" action="{{ url_for('admin.user_approve', user_id=user.id) }}">
         <button class="btn btn-success">Подтвердить</button>
+		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% endif %}
 
       {% if not user.is_blocked %}
       <form method="POST" action="{{ url_for('admin.user_block', user_id=user.id) }}">
         <button class="btn btn-warning">Заблокировать</button>
+		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% else %}
       <form method="POST" action="{{ url_for('admin.user_unblock', user_id=user.id) }}">
         <button class="btn btn-success">Разблокировать</button>
+		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% endif %}
 
       {% if user.id != current_user.id %}
       <form method="POST" action="{{ url_for('admin.user_delete', user_id=user.id) }}" onsubmit="return confirm('Удалить пользователя?');">
         <button class="btn btn-danger">Удалить</button>
+		<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% endif %}
     </div>
@@ -105,6 +110,7 @@
             <a class="btn btn-sm btn-primary" href="{{ url_for('keys.key_detail', key_id=key.id) }}">Открыть</a>
             <form method="POST" action="{{ url_for('users.unassign_key', user_id=user.id, key_id=key.id) }}">
               <button class="btn btn-sm btn-warning">Отвязать</button>
+			  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             </form>
           </td>
         </tr>
@@ -124,6 +130,7 @@
       <label for="new_password"><strong>Новый пароль</strong></label><br>
       <input id="new_password" name="new_password" type="password" minlength="8" required>
       <button class="btn btn-warning" type="submit">Обновить пароль</button>
+	  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
     <p style="margin-top:8px;color:#666;">
       Пароль не выводится в интерфейс после изменения.
