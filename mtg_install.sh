@@ -47,21 +47,17 @@ install_mtg_secure() {
   curl -fsSL "${asset_url}" -o "${TMP_DIR}/${file_name}"
 
   expected_sha="${MTG_SHA256:-}"
-  if [[ -z "${expected_sha}" ]]; then
-    if [[ -n "${checksums_url}" && "${checksums_url}" != "null" ]]; then
-      curl -fsSL "${checksums_url}" -o "${TMP_DIR}/checksums.txt"
-      expected_sha="$(grep " ${file_name}\$" "${TMP_DIR}/checksums.txt" | awk '{print $1}' | head -n1 || true)"
-    fi
+  if [[ -z "${expected_sha}" && -n "${checksums_url}" && "${checksums_url}" != "null" ]]; then
+    curl -fsSL "${checksums_url}" -o "${TMP_DIR}/checksums.txt"
+    expected_sha="$(grep " ${file_name}\$" "${TMP_DIR}/checksums.txt" | awk '{print $1}' | head -n1 || true)"
   fi
 
   if [[ -z "${expected_sha}" ]]; then
-    echo "MTG checksum is not available."
-    echo "Set MTG_SHA256 env var explicitly to continue securely."
+    echo "MTG checksum is not available. Set MTG_SHA256=<sha256>."
     exit 1
   fi
 
   echo "${expected_sha}  ${TMP_DIR}/${file_name}" | sha256sum -c -
-
   tar -xzf "${TMP_DIR}/${file_name}" -C "${TMP_DIR}"
   install -m 0755 "$(find "${TMP_DIR}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
 }
@@ -70,10 +66,8 @@ apt-get update -y
 apt-get install -y curl jq tar ca-certificates
 
 install_mtg_secure
-
 mkdir -p "${APP_DIR}/mtg/instances"
 install -m 0644 "${APP_DIR}/app/deploy/systemd/mtg@.service" /etc/systemd/system/mtg@.service
-
 systemctl daemon-reload
-echo "MTG multi-instance runtime installed securely"
-echo "Use: systemctl start mtg@<instance_id>.service"
+
+echo "MTG runtime installed."
