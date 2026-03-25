@@ -3,31 +3,108 @@
 {% block page_title %}Панель администратора{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-header"><h3>MTG</h3></div>
-  <div class="card-body">
-    <p><strong>Установлен:</strong> {{ "Да" if mtg_status.get("installed") else "Нет" }}</p>
-    <p><strong>Инстансов всего:</strong> {{ mtg_status.get("instances_total", 0) }}</p>
-    <p><strong>Инстансов запущено:</strong> {{ mtg_status.get("instances_running", 0) }}</p>
+<div class="dashboard-grid" style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+
+  <div class="card">
+    <div class="card-header"><h3>MTG</h3></div>
+    <div class="card-body">
+      <p><strong>Установлен:</strong> {{ "Да" if mtg_status.get("installed") else "Нет" }}</p>
+      <p><strong>Инстансов всего:</strong> {{ mtg_status.get("instances_total", 0) }}</p>
+      <p><strong>Инстансов запущено:</strong> {{ mtg_status.get("instances_running", 0) }}</p>
+    </div>
   </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Пользователи</h3></div>
+    <div class="card-body">
+      <p><strong>Всего:</strong> {{ users_stats.get("total", 0) }}</p>
+      <p><strong>Подтверждено:</strong> {{ users_stats.get("approved", 0) }}</p>
+      <p><strong>Ожидают:</strong> {{ users_stats.get("pending", 0) }}</p>
+      <p><strong>Заблокированы:</strong> {{ users_stats.get("blocked", 0) }}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Инстансы</h3></div>
+    <div class="card-body">
+      <p><strong>Всего:</strong> {{ keys_stats.get("total", 0) }}</p>
+      <p><strong>Активные:</strong> {{ keys_stats.get("active", 0) }}</p>
+      <p><strong>Заблокированные:</strong> {{ keys_stats.get("blocked", 0) }}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Трафик (суммарно)</h3></div>
+    <div class="card-body">
+      <p><strong>Всего трафика:</strong> <span id="traffic-total">{{ traffic_stats.get("total_traffic_formatted", "0 Б") }}</span></p>
+      <p><strong>Текущий период:</strong> <span id="traffic-period">{{ traffic_stats.get("current_period_formatted", "0 Б") }}</span></p>
+      <p><strong>Соединения:</strong> <span id="traffic-connections">{{ traffic_stats.get("connections", 0) }}</span></p>
+      <p><strong>Активных инстансов:</strong> <span id="traffic-active">{{ traffic_stats.get("active_keys", 0) }}</span></p>
+      <p><strong>Последняя активность:</strong> <span id="traffic-last">{{ traffic_stats.get("last_activity") or "—" }}</span></p>
+    </div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <h3>Мониторинг трафика по инстансам</h3>
+      <button class="btn btn-sm btn-secondary" type="button" onclick="refreshTraffic()">Обновить</button>
+    </div>
+    <div class="card-body">
+      <table class="table" id="traffic-table">
+        <thead>
+          <tr>
+            <th>Инстанс</th>
+            <th>Входящий</th>
+            <th>Исходящий</th>
+            <th>Итого</th>
+            <th>Соединения</th>
+          </tr>
+        </thead>
+        <tbody id="traffic-body">
+          <tr><td colspan="5">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
-<div class="card" style="margin-top:16px;">
-  <div class="card-header"><h3>Пользователи</h3></div>
-  <div class="card-body">
-    <p>Всего: {{ users_stats.get("total", 0) }}</p>
-    <p>Подтверждено: {{ users_stats.get("approved", 0) }}</p>
-    <p>Ожидают: {{ users_stats.get("pending", 0) }}</p>
-    <p>Заблокированы: {{ users_stats.get("blocked", 0) }}</p>
-  </div>
-</div>
+<script>
+async function refreshTraffic() {
+  try {
+    const res = await fetch("{{ url_for('admin.api_traffic_stats') }}?period=day", { credentials: "same-origin" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
 
-<div class="card" style="margin-top:16px;">
-  <div class="card-header"><h3>Инстансы</h3></div>
-  <div class="card-body">
-    <p>Всего: {{ keys_stats.get("total", 0) }}</p>
-    <p>Активные: {{ keys_stats.get("active", 0) }}</p>
-    <p>Заблокированные: {{ keys_stats.get("blocked", 0) }}</p>
-  </div>
-</div>
+    const total = data.total || {};
+    document.getElementById("traffic-total").textContent = total.total_traffic_formatted || "0 Б";
+    document.getElementById("traffic-period").textContent = total.current_period_formatted || "0 Б";
+    document.getElementById("traffic-connections").textContent = total.connections ?? 0;
+    document.getElementById("traffic-active").textContent = total.active_keys ?? 0;
+    document.getElementById("traffic-last").textContent = total.last_activity || "—";
+
+    const body = document.getElementById("traffic-body");
+    const rows = data.keys || [];
+    if (!rows.length) {
+      body.innerHTML = "<tr><td colspan='5'>Нет данных по трафику</td></tr>";
+      return;
+    }
+
+    body.innerHTML = rows.map(item => `
+      <tr>
+        <td>${item.key_name || item.key_id || "—"}</td>
+        <td>${item.formatted_in || "0 Б"}</td>
+        <td>${item.formatted_out || "0 Б"}</td>
+        <td>${item.formatted_total || "0 Б"}</td>
+        <td>${item.connections ?? 0}</td>
+      </tr>
+    `).join("");
+  } catch (e) {
+    document.getElementById("traffic-body").innerHTML = "<tr><td colspan='5'>Ошибка загрузки трафика</td></tr>";
+  }
+}
+
+refreshTraffic();
+setInterval(refreshTraffic, 15000);
+</script>
 {% endblock %}
