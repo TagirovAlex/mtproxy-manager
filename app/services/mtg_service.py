@@ -85,10 +85,10 @@ class MTGService:
             'metric-prefix = "mtg"\n'
         )
 
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
 
-    return path
+        return path
 
     def create_instance(
         self,
@@ -198,14 +198,8 @@ class MTGService:
             if val.isdigit() and int(val) > 0:
                 pid = int(val)
 
-        return {
-            "unit": unit,
-            "active": ok_active,
-            "pid": pid,
-            "raw": raw,
-        }
+        return {"unit": unit, "active": ok_active, "pid": pid, "raw": raw}
 
-    # Compatibility methods for old admin dashboard buttons.
     def start(self) -> Tuple[bool, str]:
         failed = []
         for inst in ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all():
@@ -242,7 +236,6 @@ class MTGService:
     def get_status(self) -> Dict:
         instances = ProxyInstance.query.all()
         running_count = 0
-
         for item in instances:
             if self.instance_status(item.id).get("active"):
                 running_count += 1
@@ -254,17 +247,14 @@ class MTGService:
             "instances_running": running_count,
             "active_keys": len(instances),
             "connections": 0,
-            # Compatibility key for old callers:
             "running": running_count > 0,
         }
 
-    # Compatibility method for old traffic monitor calls.
     def get_stats(self) -> Optional[Dict]:
         return None
 
 
 def check_traffic_limits(app):
-    # Multi-instance mode: per-instance traffic limits can be implemented separately.
     with app.app_context():
         return
 
