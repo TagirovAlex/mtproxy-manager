@@ -16,7 +16,10 @@ class MTGService:
 
     @property
     def mtg_config_dir(self) -> str:
-        return current_app.config.get("MTG_CONFIG_PATH", os.path.join(current_app.config["BASE_DIR"], "mtg"))
+        return current_app.config.get(
+            "MTG_CONFIG_PATH",
+            os.path.join(current_app.config["BASE_DIR"], "mtg"),
+        )
 
     @property
     def instances_dir(self) -> str:
@@ -94,20 +97,25 @@ class MTGService:
         notes: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[ProxyInstance]]:
         bind_ip = (bind_ip or "0.0.0.0").strip()
+        bind_port = int(bind_port)
 
-        exists = ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=int(bind_port)).first()
+        exists = ProxyInstance.query.filter_by(bind_ip=bind_ip, bind_port=bind_port).first()
         if exists:
             return False, "Этот bind_ip:bind_port уже занят", None
 
-        secret, domain = KeyGenerator.generate_secret(fake_tls_domain)
+        try:
+            secret, domain = KeyGenerator.generate_secret(fake_tls_domain)
+        except ValueError as exc:
+            return False, str(exc), None
+
         stats_port = self._pick_free_stats_port()
 
         instance = ProxyInstance(
-            name=name.strip(),
+            name=(name or "").strip(),
             secret=secret,
             fake_tls_domain=domain,
             bind_ip=bind_ip,
-            bind_port=int(bind_port),
+            bind_port=bind_port,
             stats_port=stats_port,
             owner_user_id=owner_user_id if owner_user_id else None,
             is_enabled=True,
@@ -132,7 +140,10 @@ class MTGService:
 
     def update_instance(self, instance: ProxyInstance, regenerate_secret: bool = False) -> Tuple[bool, str]:
         if regenerate_secret:
-            secret, domain = KeyGenerator.generate_secret(instance.fake_tls_domain)
+            try:
+                secret, domain = KeyGenerator.generate_secret(instance.fake_tls_domain)
+            except ValueError as exc:
+                return False, str(exc)
             instance.secret = secret
             instance.fake_tls_domain = domain
 
@@ -191,7 +202,7 @@ class MTGService:
             "raw": raw,
         }
 
-    # Compatibility methods for admin dashboard buttons.
+    # Compatibility methods for old admin dashboard buttons.
     def start(self) -> Tuple[bool, str]:
         failed = []
         for inst in ProxyInstance.query.filter_by(is_enabled=True, is_blocked=False).all():

@@ -1,10 +1,11 @@
 """
-MTG FakeTLS secret generator and validator.
-Compatible with existing project API.
+Генератор и валидатор FakeTLS-секретов для MTG.
+Поддерживает произвольные валидные домены (без жесткого whitelist).
 """
 
 from __future__ import annotations
 
+import re
 import secrets
 from typing import Optional, Tuple, Dict, List
 
@@ -12,29 +13,43 @@ from typing import Optional, Tuple, Dict, List
 class KeyGenerator:
     FAKE_TLS_PREFIX = "ee"
     RANDOM_BYTES_LENGTH = 16
+    DEFAULT_DOMAIN = "www.google.com"
 
+    # Валидатор FQDN (упрощенный, но практичный)
+    _DOMAIN_RE = re.compile(
+        r"^(?=.{1,253}$)(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[A-Za-z]{2,63}$"
+    )
+
+    # Оставляем для совместимости с UI/старыми вызовами.
+    # Можно использовать как подсказки в интерфейсе.
     ALLOWED_DOMAINS = [
         "www.google.com",
         "www.microsoft.com",
-        "www.apple.com",
         "www.cloudflare.com",
         "www.amazon.com",
-        "www.youtube.com",
-        "www.facebook.com",
-        "www.instagram.com",
-        "www.twitter.com",
-        "www.linkedin.com",
-        "www.netflix.com",
-        "www.spotify.com",
     ]
-    DEFAULT_DOMAIN = "www.google.com"
+
+    @classmethod
+    def _normalize_domain(cls, domain: str) -> str:
+        return (domain or "").strip().lower().rstrip(".")
+
+    @classmethod
+    def _is_valid_domain(cls, domain: str) -> bool:
+        d = cls._normalize_domain(domain)
+        return bool(cls._DOMAIN_RE.match(d))
 
     @classmethod
     def generate_secret(cls, domain: Optional[str] = None) -> Tuple[str, str]:
+        """
+        Формат секрета:
+        ee + 16 случайных байт (32 hex) + domain hex
+        """
         if not domain:
-            domain = secrets.choice(cls.ALLOWED_DOMAINS)
-        elif domain not in cls.ALLOWED_DOMAINS:
             domain = cls.DEFAULT_DOMAIN
+
+        domain = cls._normalize_domain(domain)
+        if not cls._is_valid_domain(domain):
+            raise ValueError(f"Invalid FakeTLS domain: {domain}")
 
         random_hex = secrets.token_bytes(cls.RANDOM_BYTES_LENGTH).hex()
         domain_hex = domain.encode("utf-8").hex()
@@ -44,11 +59,13 @@ class KeyGenerator:
     @classmethod
     def _decode_domain_raw(cls, secret: str) -> Optional[str]:
         # ee + 32 hex random + domain hex
-        if len(secret) < 36:
+        if not secret or len(secret) < 36:
             return None
+
         domain_hex = secret[34:]
         if not domain_hex or len(domain_hex) % 2 != 0:
             return None
+
         try:
             return bytes.fromhex(domain_hex).decode("utf-8")
         except Exception:
@@ -56,8 +73,8 @@ class KeyGenerator:
 
     @classmethod
     def decode_domain_from_secret(cls, secret: str) -> Optional[str]:
-        is_valid, _ = cls.validate_secret(secret)
-        if not is_valid:
+        ok, _ = cls.validate_secret(secret)
+        if not ok:
             return None
         return cls._decode_domain_raw(secret)
 
@@ -67,6 +84,7 @@ class KeyGenerator:
             return False, "Secret is empty"
 
         s = secret.strip().lower()
+
         if not s.startswith(cls.FAKE_TLS_PREFIX):
             return False, "Secret must start with ee (FakeTLS)"
 
@@ -81,6 +99,9 @@ class KeyGenerator:
         domain = cls._decode_domain_raw(s)
         if not domain:
             return False, "Cannot decode domain from secret"
+
+        if not cls._is_valid_domain(domain):
+            return False, f"Decoded domain is invalid: {domain}"
 
         return True, f"OK (domain: {domain})"
 
@@ -115,10 +136,9 @@ class KeyGenerator:
 
     @classmethod
     def get_allowed_domains(cls) -> List[str]:
+        # Возвращаем подсказки, не ограничение.
         return list(cls.ALLOWED_DOMAINS)
 
     @classmethod
     def regenerate_secret_with_domain(cls, new_domain: str) -> Tuple[str, str]:
-        if new_domain not in cls.ALLOWED_DOMAINS:
-            raise ValueError(f"Domain {new_domain} is not allowed")
         return cls.generate_secret(new_domain)
