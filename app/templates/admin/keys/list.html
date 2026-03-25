@@ -4,6 +4,7 @@
 {% block page_title %}Инстансы MTG{% endblock %}
 
 {% block content %}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">Создать инстанс</a>
 

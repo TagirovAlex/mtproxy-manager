@@ -119,7 +119,7 @@ Environment=FLASK_CONFIG=production
 ExecStart=${VENV_DIR}/bin/gunicorn -w 2 -b 127.0.0.1:5000 run:app
 Restart=always
 RestartSec=3
-NoNewPrivileges=true
+NoNewPrivileges=flase
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true

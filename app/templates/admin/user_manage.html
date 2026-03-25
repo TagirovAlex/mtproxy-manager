@@ -4,6 +4,7 @@
 {% block page_title %}Пользователь: {{ user.email }}{% endblock %}
 
 {% block content %}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
   <a href="{{ url_for('admin.users_list') }}" class="btn btn-secondary">← К списку пользователей</a>
   <div style="display:flex;gap:8px;align-items:center;">
