@@ -2,8 +2,8 @@ import os
 import shutil
 import tarfile
 import json
-from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from datetime import datetime, timedelta
+from typing import Tuple, Optional
 from flask import current_app
 
 from app import db
@@ -22,7 +22,10 @@ class BackupService:
         return current_app.config.get("BACKUPS_PATH", "backups")
 
     def _base_dir(self) -> str:
-        return current_app.config.get("BASE_DIR", os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        return current_app.config.get(
+            "BASE_DIR",
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        )
 
     def create_backup(self, notes: str = None, backup_type: str = "manual") -> Tuple[bool, str, Optional[str]]:
         try:
@@ -51,7 +54,13 @@ class BackupService:
                 os.remove(meta_path)
 
             size = os.path.getsize(filepath)
-            rec = BackupRecord(filename=filename, filepath=filepath, size=size, backup_type=backup_type, notes=notes)
+            rec = BackupRecord(
+                filename=filename,
+                filepath=filepath,
+                size=size,
+                backup_type=backup_type,
+                notes=notes
+            )
             db.session.add(rec)
             db.session.commit()
             return True, f"Backup created: {filename}", filepath
@@ -100,6 +109,73 @@ class BackupService:
         finally:
             if os.path.exists(tmp):
                 shutil.rmtree(tmp)
+
+    def get_all_backups(self):
+        return BackupRecord.query.order_by(BackupRecord.created_at.desc()).all()
+
+    def get_backup_settings(self):
+        return {
+            "auto_backup_enabled": Settings.get("auto_backup_enabled", False),
+            "auto_backup_interval": Settings.get("auto_backup_interval", "daily"),
+        }
+
+    def update_backup_settings(self, enabled: bool, interval: str) -> bool:
+        try:
+            Settings.set("auto_backup_enabled", str(enabled).lower(), "bool")
+            Settings.set("auto_backup_interval", interval, "string")
+            return True
+        except Exception:
+            return False
+
+    def download_backup(self, backup_id: int) -> Optional[str]:
+        rec = BackupRecord.query.get(backup_id)
+        if not rec:
+            return None
+        return rec.filepath if os.path.exists(rec.filepath) else None
+
+    def delete_backup(self, backup_id: int) -> Tuple[bool, str]:
+        rec = BackupRecord.query.get(backup_id)
+        if not rec:
+            return False, "Backup not found"
+        try:
+            if os.path.exists(rec.filepath):
+                os.remove(rec.filepath)
+            db.session.delete(rec)
+            db.session.commit()
+            return True, "Backup deleted"
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Delete error: {e}"
+
+    def get_backup_info(self, backup_id: int):
+        return BackupRecord.query.get(backup_id)
+
+    def _is_backup_due(self, interval: str) -> bool:
+        last = BackupRecord.query.filter_by(backup_type="auto").order_by(BackupRecord.created_at.desc()).first()
+        if not last:
+            return True
+
+        now = datetime.utcnow()
+        delta = now - last.created_at
+
+        if interval == "daily":
+            return delta >= timedelta(days=1)
+        if interval == "weekly":
+            return delta >= timedelta(days=7)
+        if interval == "monthly":
+            return delta >= timedelta(days=30)
+        return False
+
+
+def auto_backup(app):
+    with app.app_context():
+        service = BackupService()
+        enabled = Settings.get("auto_backup_enabled", False)
+        interval = Settings.get("auto_backup_interval", "daily")
+        if not enabled:
+            return
+        if service._is_backup_due(interval):
+            service.create_backup(notes=f"Auto backup ({interval})", backup_type="auto")
 
 
 def get_backup_service() -> BackupService:

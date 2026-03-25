@@ -148,20 +148,20 @@ def register_error_handlers(app):
     
     @app.errorhandler(404)
     def not_found_error(error):
-        return render_template('errors/404.html'), 404
+        return render_template('admin/errors/404.html'), 404
     
     @app.errorhandler(403)
     def forbidden_error(error):
-        return render_template('errors/403.html'), 403
+        return render_template('admin/errors/403.html'), 403
     
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
-        return render_template('errors/500.html'), 500
+        return render_template('admin/errors/500.html'), 500
     
     @app.errorhandler(429)
     def ratelimit_error(error):
-        return render_template('errors/429.html'), 429
+        return render_template('admin/errors/429.html'), 429
 
 
 def register_context_processors(app):

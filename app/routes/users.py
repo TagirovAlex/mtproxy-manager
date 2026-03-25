@@ -46,7 +46,7 @@ def user_keys(user_id):
         ProxyKey.created_at.desc()
     ).all()
     
-    return render_template('users/keys.html', user=user, keys=keys)
+    return render_template('admin/users/keys.html', user=user, keys=keys)
 
 
 @users_bp.route('/<int:user_id>/assign-key', methods=['POST'])
@@ -101,7 +101,7 @@ def login_history(user_id):
         LoginAttempt.timestamp.desc()
     ).paginate(page=page, per_page=per_page, error_out=False)
     
-    return render_template('users/login_history.html', user=user, attempts=attempts)
+    return render_template('admin/users/login_history.html', user=user, attempts=attempts)
 
 
 @users_bp.route('/<int:user_id>/reset-password', methods=['POST'])
