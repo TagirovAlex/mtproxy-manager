@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}История скриптов — {{ app_name }}{% endblock %}
+
+{% block page_title %}История выполнения скриптов{% endblock %}
+
+{% block content %}
+<div class="script-history-page">
+    <div class="page-header">
+        <div class="header-left">
+            <a href="{{ url_for('scripts.index') }}" class="btn btn-secondary">
+                ← К списку скриптов
+            </a>
+        </div>
+        <div class="header-right">
+            {% if results %}
+            <form action="{{ url_for('scripts.clear_history') }}" 
+                  method="POST" 
+                  class="inline-form"
+                  onsubmit="return confirm('Очистить историю выполнения?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-danger">
+                    🗑️ Очистить историю
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>📋 История выполнения</h3>
+        </div>
+        
+        <div class="card-body">
+            {% if results %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Скрипт</th>
+                            <th>Статус</th>
+                            <th>Код выхода</th>
+                            <th>Запущен</th>
+                            <th>Завершён</th>
+                            <th>Пользователь</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for script_id, info in results %}
+                        <tr>
+                            <td><code>{{ script_id[:8] }}...</code></td>
+                            <td><code>{{ info.script_name }}</code></td>
+                            <td>
+                                {% if info.status == 'running' %}
+                                    <span class="badge badge-warning">Выполняется</span>
+                                {% elif info.status == 'pending' %}
+                                    <span class="badge badge-secondary">Ожидание</span>
+                                {% elif info.status == 'completed' %}
+                                    {% if info.exit_code == 0 %}
+                                        <span class="badge badge-success">Успешно</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">Ошибка</span>
+                                    {% endif %}
+                                {% elif info.status == 'error' %}
+                                    <span class="badge badge-danger">Ошибка</span>
+                                {% elif info.status == 'timeout' %}
+                                    <span class="badge badge-danger">Тайм��ут</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">{{ info.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if info.exit_code is defined and info.exit_code is not none %}
+                                    <code>{{ info.exit_code }}</code>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if info.created_at %}
+                                    {{ info.created_at[:19] }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if info.finished_at %}
+                                    {{ info.finished_at[:19] }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ info.user or '—' }}</td>
+                            <td>
+                                <a href="{{ url_for('scripts.result', script_id=script_id) }}" 
+                                   class="btn btn-sm btn-secondary">
+                                    Просмотр
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <h4>История пуста</h4>
+                <p>Здесь будут отображаться результаты выполнения скриптов</p>
+                <a href="{{ url_for('scripts.index') }}" class="btn btn-primary">
+                    Перейти к скриптам
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Информация -->
+    <div class="card card-info">
+        <div class="card-body">
+            <p class="text-muted">
+                💡 История хранится в памяти и будет очищена при перезапуске приложения. 
+                Отображаются последние 50 записей.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

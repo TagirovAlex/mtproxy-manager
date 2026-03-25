@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование: {{ key.name }} — {{ app_name }}{% endblock %}
+
+{% block page_title %}Редактирование ключа{% endblock %}
+
+{% block content %}
+<div class="key-edit-page">
+    <div class="page-header">
+        <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" class="btn btn-secondary">
+            ← Назад к ключу
+        </a>
+    </div>
+    
+    <form method="POST" action="{{ url_for('keys.key_edit', key_id=key.id) }}" class="form-edit-key">
+        {{ form.hidden_tag() }}
+        
+        <!-- Основные настройки -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📝 Основные настройки</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="name" class="form-label">
+                        Название ключа <span class="required">*</span>
+                    </label>
+                    <input type="text" 
+                           id="name" 
+                           name="name" 
+                           class="form-input {% if form.name.errors %}is-invalid{% endif %}"
+                           value="{{ form.name.data or '' }}"
+                           placeholder="Название ключа"
+                           maxlength="100"
+                           required>
+                    {% if form.name.errors %}
+                        {% for error in form.name.errors %}
+                        <span class="form-error">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                {% if current_user.is_admin %}
+                <div class="form-group">
+                    <label for="fake_tls_domain" class="form-label">
+                        Домен FakeTLS
+                    </label>
+                    <select id="fake_tls_domain" 
+                            name="fake_tls_domain" 
+                            class="form-select">
+                        {% for value, label in form.fake_tls_domain.choices %}
+                        <option value="{{ value }}" {% if form.fake_tls_domain.data == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="form-hint">
+                        ⚠️ Изменение домена приведёт к перегенерации секрета. Текущие ссылки перестанут работать!
+                    </span>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user_id" class="form-label">
+                        Привязка к пользователю
+                    </label>
+                    <select id="user_id" 
+                            name="user_id" 
+                            class="form-select">
+                        {% for value, label in form.user_id.choices %}
+                        <option value="{{ value }}" {% if form.user_id.data == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="form-hint">Пользователь сможет видеть этот ключ в своём профиле</span>
+                </div>
+                
+                <div class="form-group form-group-checkbox">
+                    <label class="checkbox-label">
+                        <input type="checkbox" 
+                               name="is_active" 
+                               id="is_active"
+                               {{ 'checked' if form.is_active.data else '' }}>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Ключ активен</span>
+                    </label>
+                    <span class="form-hint">Неактивные ключи не включаются в конфигурацию MTG</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if current_user.is_admin %}
+        <!-- Лимиты трафика -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📊 Лимиты трафика</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group form-group-checkbox">
+                    <label class="checkbox-label">
+                        <input type="checkbox" 
+                               name="traffic_limit_enabled" 
+                               id="traffic_limit_enabled"
+                               {{ 'checked' if form.traffic_limit_enabled.data else '' }}>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">Установить лимит трафика</span>
+                    </label>
+                </div>
+                
+                <div id="traffic-limit-settings" class="{% if not form.traffic_limit_enabled.data %}hidden{% endif %}">
+                    <div class="form-row">
+                        <div class="form-group form-group-inline">
+                            <label for="traffic_limit_value" class="form-label">Лимит</label>
+                            <input type="number" 
+                                   id="traffic_limit_value" 
+                                   name="traffic_limit_value" 
+                                   class="form-input"
+                                   value="{{ form.traffic_limit_value.data or '' }}"
+                                   min="1"
+                                   placeholder="Количество">
+                        </div>
+                        
+                        <div class="form-group form-group-inline">
+                            <label for="traffic_limit_unit" class="form-label">Единица</label>
+                            <select id="traffic_limit_unit" 
+                                    name="traffic_limit_unit" 
+                                    class="form-select">
+                                {% for value, label in form.traffic_limit_unit.choices %}
+                                <option value="{{ value }}" {% if form.traffic_limit_unit.data == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group form-group-inline">
+                            <label for="traffic_limit_period" class="form-label">Период</label>
+                            <select id="traffic_limit_period" 
+                                    name="traffic_limit_period" 
+                                    class="form-select">
+                                {% for value, label in form.traffic_limit_period.choices %}
+                                <option value="{{ value }}" {% if form.traffic_limit_period.data == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-hint">
+                        При превышении лимита ключ автоматически исключается из конфигурации до сброса счётчика.
+                    </div>
+                    
+                    {% if key.traffic_limit %}
+                    <div class="current-limit-info">
+                        <strong>Текущее использование:</strong>
+                        {{ key.format_traffic(key.traffic_used) }} / {{ key.format_traffic(key.traffic_limit) }}
+                        {% if key.traffic_reset_at %}
+                        <br><strong>Следующий сброс:</strong> {{ key.traffic_reset_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Заметки -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📝 Заметки</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="notes" class="form-label">Заметки (необязательно)</label>
+                    <textarea id="notes" 
+                              name="notes" 
+                              class="form-textarea"
+                              rows="4"
+                              maxlength="1000"
+                              placeholder="Любая дополнительная информация о ключе...">{{ form.notes.data or '' }}</textarea>
+                    <span class="form-hint">Максимум 1000 символов</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Кнопки -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                💾 Сохранить изменения
+            </button>
+            <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" class="btn btn-secondary">
+                Отмена
+            </a>
+        </div>
+    </form>
+    
+    <!-- Информация о ключе -->
+    <div class="card card-info">
+        <div class="card-header">
+            <h3>ℹ️ Информация о ключе</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">ID:</span>
+                    <span>{{ key.id }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Создан:</span>
+                    <span>{{ key.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Текущий домен FakeTLS:</span>
+                    <code>{{ key.fake_tls_domain }}</code>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Секрет (сокращённо):</span>
+                    <code>{{ key.secret[:16] }}...</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const limitCheckbox = document.getElementById('traffic_limit_enabled');
+    const limitSettings = document.getElementById('traffic-limit-settings');
+    
+    function toggleLimitSettings() {
+        if (limitCheckbox.checked) {
+            limitSettings.classList.remove('hidden');
+        } else {
+            limitSettings.classList.add('hidden');
+        }
+    }
+    
+    limitCheckbox.addEventListener('change', toggleLimitSettings);
+    
+    // Предупреждение при смене домена
+    const domainSelect = document.getElementById('fake_tls_domain');
+    const originalDomain = domainSelect.value;
+    
+    domainSelect.addEventListener('change', function() {
+        if (this.value !== originalDomain) {
+            if (!confirm('Изменение домена FakeTLS приведёт к перегенерации секрета. Текущие ссылки перестанут работать! Продолжить?')) {
+                this.value = originalDomain;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <div class="app-container">
+        <!-- Боковая навигация -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">MTProxy</h1>
+                <span class="version">v{{ app_version }}</span>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <!-- Основное меню -->
+                <div class="nav-section">
+                    <span class="nav-section-title">Основное</span>
+                    
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                        <span class="nav-icon">📊</span>
+                        <span>Dashboard</span>
+                    </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('keys.list_keys') }}" class="nav-link {% if request.endpoint and 'keys.' in request.endpoint %}active{% endif %}">
+                        <span class="nav-icon">🔑</span>
+                        <span>Ключи</span>
+                    </a>
+                    
+                    <a href="{{ url_for('keys.create_key') }}" class="nav-link {% if request.endpoint == 'keys.create_key' %}active{% endif %}">
+                        <span class="nav-icon">➕</span>
+                        <span>Создать ключ</span>
+                    </a>
+                </div>
+                
+                {% if current_user.is_admin %}
+                <!-- Администрирование -->
+                <div class="nav-section">
+                    <span class="nav-section-title">Администрирование</span>
+                    
+                    <a href="{{ url_for('admin.users_list') }}" class="nav-link {% if request.endpoint and 'admin.user' in request.endpoint %}active{% endif %}">
+                        <span class="nav-icon">👥</span>
+                        <span>Пользователи</span>
+                    </a>
+                    
+                    <a href="{{ url_for('admin.settings') }}" class="nav-link {% if request.endpoint == 'admin.settings' %}active{% endif %}">
+                        <span class="nav-icon">⚙️</span>
+                        <span>Настройки</span>
+                    </a>
+                    
+                    <a href="{{ url_for('scripts.index') }}" class="nav-link {% if request.endpoint and 'scripts.' in request.endpoint %}active{% endif %}">
+                        <span class="nav-icon">📜</span>
+                        <span>Скрипты</span>
+                    </a>
+                    
+                    <a href="{{ url_for('backup.index') }}" class="nav-link {% if request.endpoint and 'backup.' in request.endpoint %}active{% endif %}">
+                        <span class="nav-icon">💾</span>
+                        <span>Бэкапы</span>
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- Профиль -->
+                <div class="nav-section">
+                    <span class="nav-section-title">Профиль</span>
+                    
+                    <a href="{{ url_for('profile.edit') }}" class="nav-link {% if request.endpoint and 'profile.' in request.endpoint %}active{% endif %}">
+                        <span class="nav-icon">👤</span>
+                        <span>Мой профиль</span>
+                    </a>
+                    
+                    {% if not current_user.is_admin %}
+                    <a href="{{ url_for('profile.my_keys') }}" class="nav-link {% if request.endpoint == 'profile.my_keys' %}active{% endif %}">
+                        <span class="nav-icon">🔐</span>
+                        <span>Мои ключи</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </nav>
+            
+            <!-- Статус MTG (только для админа) -->
+            {% if current_user.is_admin %}
+            <div class="sidebar-footer">
+                <div class="mtg-status" id="mtg-status-widget">
+                    <span class="status-label">MTG Proxy:</span>
+                    <span class="status-indicator loading">...</span>
+                </div>
+            </div>
+            {% endif %}
+        </aside>
+        
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Верхняя панель -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <h2 class="page-title">{% block page_title %}{% endblock %}</h2>
+                </div>
+                
+                <div class="top-bar-right">
+                    <div class="user-info">
+                        <span class="user-email">{{ current_user.email }}</span>
+                        <span class="user-status badge {% if current_user.is_admin %}badge-admin{% else %}badge-user{% endif %}">
+                            {{ current_user.get_status() }}
+                        </span>
+                    </div>
+                    <a href="{{ url_for('auth.logout') }}" class="btn btn-logout" title="Выйти">
+                        <span class="logout-icon">🚪</span>
+                        <span class="logout-text">Выйти</span>
+                    </a>
+                </div>
+            </header>
+            
+            <!-- Flash сообщения -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <span class="alert-message">{{ message }}</span>
+                        <button type="button" class="alert-close" aria-label="Закрыть">&times;</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Контент страницы -->
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    {% else %}
+    <!-- Страница без авторизации -->
+    <div class="auth-container">
+        <!-- Flash сообщения -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    <span class="alert-message">{{ message }}</span>
+                    <button type="button" class="alert-close" aria-label="Закрыть">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% block auth_content %}{% endblock %}
+    </div>
+    {% endif %}
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

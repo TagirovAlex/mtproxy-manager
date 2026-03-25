@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Регистрация — {{ app_name }}{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <h1 class="auth-logo">MTProxy Manager</h1>
+        <p class="auth-subtitle">Создайте новый аккаунт</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('auth.register') }}" class="auth-form">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" 
+                   id="email" 
+                   name="email" 
+                   class="form-input {% if form.email.errors %}is-invalid{% endif %}"
+                   value="{{ form.email.data or '' }}"
+                   placeholder="your@email.com"
+                   autocomplete="email"
+                   required 
+                   autofocus>
+            {% if form.email.errors %}
+                {% for error in form.email.errors %}
+                <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="password" class="form-label">Пароль</label>
+            <div class="password-input-wrapper">
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       class="form-input {% if form.password.errors %}is-invalid{% endif %}"
+                       placeholder="Минимум 8 символов"
+                       autocomplete="new-password"
+                       minlength="8"
+                       required>
+                <button type="button" class="password-toggle" data-target="password" aria-label="Показать пароль">
+                    <span class="eye-icon">👁️</span>
+                </button>
+            </div>
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+            <span class="form-hint">Минимум 8 символов</span>
+        </div>
+        
+        <div class="form-group">
+            <label for="password2" class="form-label">Подтверждение пароля</label>
+            <div class="password-input-wrapper">
+                <input type="password" 
+                       id="password2" 
+                       name="password2" 
+                       class="form-input {% if form.password2.errors %}is-invalid{% endif %}"
+                       placeholder="Повторите пароль"
+                       autocomplete="new-password"
+                       required>
+                <button type="button" class="password-toggle" data-target="password2" aria-label="Показать пароль">
+                    <span class="eye-icon">👁️</span>
+                </button>
+            </div>
+            {% if form.password2.errors %}
+                {% for error in form.password2.errors %}
+                <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">
+            Зарегистрироваться
+        </button>
+    </form>
+    
+    <div class="auth-footer">
+        <p>Уже есть аккаунт? <a href="{{ url_for('auth.login') }}">Войти</a></p>
+    </div>
+    
+    <div class="auth-notice">
+        <p>⚠️ После регистрации ваш аккаунт должен быть подтверждён администратором.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Переключение видимости пароля
+    document.querySelectorAll('.password-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            if (input) {
+                const type = input.type === 'password' ? 'text' : 'password';
+                input.type = type;
+                this.querySelector('.eye-icon').textContent = type === 'password' ? '👁️' : '🙈';
+            }
+        });
+    });
+    
+    // Проверка совпадения паролей
+    const password = document.getElementById('password');
+    const password2 = document.getElementById('password2');
+    
+    function checkPasswords() {
+        if (password2.value && password.value !== password2.value) {
+            password2.setCustomValidity('Пароли не совпадают');
+        } else {
+            password2.setCustomValidity('');
+        }
+    }
+    
+    password.addEventListener('input', checkPasswords);
+    password2.addEventListener('input', checkPasswords);
+});
+</script>
+{% endblock %}

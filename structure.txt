@@ -1,0 +1,69 @@
+mtproxy-manager/
+├── app/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── forms.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── admin.py
+│   │   ├── keys.py
+│   │   ├── users.py
+│   │   ├── profile.py
+│   │   ├── scripts.py
+│   │   └── backup.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── mtg_service.py
+│   │   ├── key_generator.py
+│   │   ├── traffic_monitor.py
+│   │   ├── backup_service.py
+│   │   └── system_monitor.py
+│   ├── templates/
+│   │   ├── base.html
+│   │   ├── index.html
+│   │   ├── auth/
+│   │   │   ├── login.html
+│   │   │   ├── register.html
+│   │   │   └── pending.html
+│   │   ├── admin/
+│   │   │   ├── dashboard.html
+│   │   │   ├── users.html
+│   │   │   ├── settings.html
+│   │   │   └── scripts.html
+│   │   ├── keys/
+│   │   │   ├── list.html
+│   │   │   ├── create.html
+│   │   │   └── detail.html
+│   │   ├── profile/
+│   │   │   └── edit.html
+│   │   ├── backup/
+│   │   │   └── index.html
+│   │   └── errors/
+│   │       ├── 403.html
+│   │       ├── 404.html
+│   │       ├── 429.html
+│   │       └── 500.html
+│   └── static/
+│       ├── css/
+│       │   └── style.css
+│       └── js/
+│           └── main.js
+├── scripts/
+│   ├── example.sh
+│   └── README.md
+├── backups/
+│   └── .gitkeep
+├── data/
+│   └── .gitkeep
+├── logs/
+│   └── .gitkeep
+├── mtg/
+│   └── .gitkeep
+├── config.py
+├── requirements.txt
+├── install.sh
+├── create_admin.py
+├── mtg_install.sh
+├── run.py
+└── README.md

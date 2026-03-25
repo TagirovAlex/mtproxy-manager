@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}{{ key.name }} — {{ app_name }}{% endblock %}
+
+{% block page_title %}Ключ: {{ key.name }}{% endblock %}
+
+{% block content %}
+<div class="key-detail-page">
+    <div class="page-header">
+        <div class="header-left">
+            <a href="{{ url_for('keys.list_keys') }}" class="btn btn-secondary">
+                ← К списку ключей
+            </a>
+        </div>
+        <div class="header-right">
+            <span class="badge badge-large {% if key.is_blocked %}badge-danger{% elif not key.is_active %}badge-secondary{% elif key.check_traffic_limit() %}badge-warning{% else %}badge-success{% endif %}">
+                {{ key.get_status() }}
+            </span>
+        </div>
+    </div>
+    
+    <div class="page-grid">
+        <!-- Основной контент -->
+        <div class="page-main">
+            <!-- Ссылки для подключения -->
+            <div class="card card-links">
+                <div class="card-header">
+                    <h3>🔗 Ссылки для подключения</h3>
+                </div>
+                <div class="card-body">
+                    <div class="links-list">
+                        <!-- TG Link -->
+                        <div class="link-item">
+                            <label class="link-label">
+                                <span class="link-icon">📱</span>
+                                tg:// ссылка (для мобильных)
+                            </label>
+                            <div class="link-input-group">
+                                <input type="text" 
+                                       class="form-input link-input" 
+                                       value="{{ links.tg }}" 
+                                       readonly 
+                                       id="link-tg">
+                                <button type="button" 
+                                        class="btn btn-secondary copy-btn" 
+                                        data-target="link-tg">
+                                    📋 Копировать
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- HTTPS Link -->
+                        <div class="link-item">
+                            <label class="link-label">
+                                <span class="link-icon">🌐</span>
+                                HTTPS ссылка (универсальная)
+                            </label>
+                            <div class="link-input-group">
+                                <input type="text" 
+                                       class="form-input link-input" 
+                                       value="{{ links.https }}" 
+                                       readonly 
+                                       id="link-https">
+                                <button type="button" 
+                                        class="btn btn-secondary copy-btn" 
+                                        data-target="link-https">
+                                    📋 Копировать
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- t.me Link -->
+                        <div class="link-item">
+                            <label class="link-label">
+                                <span class="link-icon">💬</span>
+                                t.me ссылка (короткая)
+                            </label>
+                            <div class="link-input-group">
+                                <input type="text" 
+                                       class="form-input link-input" 
+                                       value="{{ links.tme }}" 
+                                       readonly 
+                                       id="link-tme">
+                                <button type="button" 
+                                        class="btn btn-secondary copy-btn" 
+                                        data-target="link-tme">
+                                    📋 Копировать
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="links-hint">
+                        <p>💡 Отправьте любую из ссылок пользователю. При открытии в Telegram автоматически предложит добавить прокси.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Статистика трафика -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📊 Статистика трафика</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <span class="stat-value">{{ traffic_stats.formatted_total }}</span>
+                            <span class="stat-label">За последние 24 часа</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">{{ key.format_traffic(key.total_traffic) }}</span>
+                            <span class="stat-label">Всего</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">{{ traffic_stats.connections }}</span>
+                            <span class="stat-label">Подключений (24ч)</span>
+                        </div>
+                    </div>
+                    
+                    {% if key.traffic_limit %}
+                    <div class="traffic-limit-info">
+                        <h4>Лимит трафика</h4>
+                        <div class="limit-bar-container">
+                            {% set percent = (key.traffic_used / key.traffic_limit * 100) if key.traffic_limit else 0 %}
+                            <div class="limit-bar">
+                                <div class="limit-bar-fill {% if percent > 90 %}danger{% elif percent > 70 %}warning{% endif %}" 
+                                     style="width: {{ [percent, 100]|min }}%"></div>
+                            </div>
+                            <div class="limit-text">
+                                {{ key.format_traffic(key.traffic_used) }} / {{ key.format_traffic(key.traffic_limit) }}
+                                ({{ "%.1f"|format(percent) }}%)
+                            </div>
+                        </div>
+                        <div class="limit-meta">
+                            <span>Период: 
+                                {% if key.traffic_limit_period == 'day' %}день
+                                {% elif key.traffic_limit_period == 'week' %}неделя
+                                {% elif key.traffic_limit_period == 'month' %}месяц
+                                {% endif %}
+                            </span>
+                            {% if key.traffic_reset_at %}
+                            <span>Сброс: {{ key.traffic_reset_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if hourly_stats %}
+                    <div class="chart-container">
+                        <h4>Активность за 24 часа</h4>
+                        <div class="simple-chart">
+                            {% for stat in hourly_stats[-24:] %}
+                            <div class="chart-bar" 
+                                 style="height: {{ [((stat.bytes_in + stat.bytes_out) / 1048576), 100]|min }}%"
+                                 title="{{ stat.hour }}: {{ ((stat.bytes_in + stat.bytes_out) / 1048576)|round(2) }} МБ">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Информация о секрете -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔐 Параметры ключа</h3>
+                </div>
+                <div class="card-body">
+                    <div class="params-list">
+                        <div class="param-item">
+                            <span class="param-label">Тип:</span>
+                            <span class="param-value">
+                                <span class="badge badge-info">FakeTLS</span>
+                            </span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Домен маскировки:</span>
+                            <span class="param-value">
+                                <code>{{ key.fake_tls_domain }}</code>
+                            </span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Сервер:</span>
+                            <span class="param-value">
+                                <code>{{ server_domain }}:{{ mtg_port }}</code>
+                            </span>
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Секрет:</span>
+                            <span class="param-value secret-value">
+                                <code id="secret-display">{{ key.secret[:16] }}...{{ key.secret[-8:] }}</code>
+                                <button type="button" class="btn btn-sm btn-link" id="toggle-secret">
+                                    Показать полностью
+                                </button>
+                            </span>
+                            <input type="hidden" id="secret-full" value="{{ key.secret }}">
+                        </div>
+                        <div class="param-item">
+                            <span class="param-label">Длина секрета:</span>
+                            <span class="param-value">{{ key.secret|length }} символов</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Боковая панель -->
+        <div class="page-sidebar">
+            <!-- Информация -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>ℹ️ Информация</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">ID:</span>
+                            <span>{{ key.id }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Создан:</span>
+                            <span>{{ key.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Изменён:</span>
+                            <span>{{ key.updated_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Последняя активность:</span>
+                            <span>
+                                {% if key.last_activity %}
+                                    {{ key.last_activity.strftime('%d.%m.%Y %H:%M') }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Владелец:</span>
+                            <span>
+                                {% if owner %}
+                                    {% if current_user.is_admin %}
+                                    <a href="{{ url_for('admin.user_manage', user_id=owner.id) }}">
+                                        {{ owner.email }}
+                                    </a>
+                                    {% else %}
+                                        {{ owner.email }}
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">Не назначен</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if key.notes %}
+                        <div class="info-item">
+                            <span class="info-label">Заметки:</span>
+                            <span>{{ key.notes }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Действия -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>⚡ Действия</h3>
+                </div>
+                <div class="card-body">
+                    <div class="action-buttons">
+                        <a href="{{ url_for('keys.key_edit', key_id=key.id) }}" class="btn btn-secondary btn-block">
+                            ✏️ Редактировать
+                        </a>
+                        
+                        <form action="{{ url_for('keys.key_regenerate', key_id=key.id) }}" 
+                              method="POST"
+                              onsubmit="return confirm('Перегенерировать секрет? Текущие ссылки перестанут работать!');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-warning btn-block">
+                                🔄 Перегенерировать секрет
+                            </button>
+                        </form>
+                        
+                        {% if current_user.is_admin %}
+                            {% if key.is_active %}
+                            <form action="{{ url_for('keys.key_toggle', key_id=key.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-secondary btn-block">
+                                    ⏸️ Деактивировать
+                                </button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for('keys.key_toggle', key_id=key.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-success btn-block">
+                                    ▶️ Активировать
+                                </button>
+                            </form>
+                            {% endif %}
+                            
+                            {% if key.is_blocked %}
+                            <form action="{{ url_for('keys.key_unblock', key_id=key.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-success btn-block">
+                                    🔓 Разблокировать
+                                </button>
+                            </form>
+                            {% else %}
+                            <form action="{{ url_for('keys.key_block', key_id=key.id) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-danger btn-block">
+                                    🔒 Заблокировать
+                                </button>
+                            </form>
+                            {% endif %}
+                            
+                            {% if key.traffic_limit %}
+                            <form action="{{ url_for('keys.key_reset_traffic', key_id=key.id) }}" 
+                                  method="POST"
+                                  onsubmit="return confirm('Сбросить счётчик трафика?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-secondary btn-block">
+                                    🔁 Сбросить счётчик трафика
+                                </button>
+                            </form>
+                            {% endif %}
+                        {% endif %}
+                        
+                        <hr>
+                        
+                        <form action="{{ url_for('keys.key_delete', key_id=key.id) }}" 
+                              method="POST"
+                              onsubmit="return confirm('Удалить ключ {{ key.name }}? Это действие необратимо!');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger btn-block">
+                                🗑️ Удалить ключ
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Копирование ссылок
+    document.querySelectorAll('.copy-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            
+            navigator.clipboard.writeText(input.value).then(function() {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✓ Скопировано';
+                btn.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Ошибка копирования:', err);
+                // Fallback
+                input.select();
+                document.execCommand('copy');
+            });
+        });
+    });
+    
+    // Показать/скрыть полный секрет
+    const toggleBtn = document.getElementById('toggle-secret');
+    const secretDisplay = document.getElementById('secret-display');
+    const secretFull = document.getElementById('secret-full');
+    let isShown = false;
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            if (isShown) {
+                secretDisplay.textContent = secretFull.value.substring(0, 16) + '...' + secretFull.value.slice(-8);
+                toggleBtn.textContent = 'Показать полностью';
+            } else {
+                secretDisplay.textContent = secretFull.value;
+                toggleBtn.textContent = 'Скрыть';
+            }
+            isShown = !isShown;
+        });
+    }
+});
+</script>
+{% endblock %}

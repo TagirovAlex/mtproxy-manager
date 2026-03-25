@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Результат: {{ result.script_name }} — {{ app_name }}{% endblock %}
+
+{% block page_title %}Результат выполнения скрипта{% endblock %}
+
+{% block content %}
+<div class="script-result-page">
+    <div class="page-header">
+        <a href="{{ url_for('scripts.index') }}" class="btn btn-secondary">
+            ← К списку скриптов
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>
+                <code>{{ result.script_name }}</code>
+                {% if result.status == 'running' %}
+                    <span class="badge badge-warning">Выполняется...</span>
+                {% elif result.status == 'completed' %}
+                    {% if result.exit_code == 0 %}
+                        <span class="badge badge-success">Успешно</span>
+                    {% else %}
+                        <span class="badge badge-danger">Код: {{ result.exit_code }}</span>
+                    {% endif %}
+                {% elif result.status == 'error' %}
+                    <span class="badge badge-danger">Ошибка</span>
+                {% elif result.status == 'timeout' %}
+                    <span class="badge badge-danger">Таймаут</span>
+                {% else %}
+                    <span class="badge badge-secondary">{{ result.status }}</span>
+                {% endif %}
+            </h3>
+        </div>
+        
+        <div class="card-body">
+            <!-- Метаданные -->
+            <div class="result-meta">
+                <div class="meta-item">
+                    <span class="meta-label">ID:</span>
+                    <code>{{ script_id }}</code>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Запущен:</span>
+                    <span>{{ result.created_at }}</span>
+                </div>
+                {% if result.started_at %}
+                <div class="meta-item">
+                    <span class="meta-label">Начало выполнения:</span>
+                    <span>{{ result.started_at }}</span>
+                </div>
+                {% endif %}
+                {% if result.finished_at %}
+                <div class="meta-item">
+                    <span class="meta-label">Завершено:</span>
+                    <span>{{ result.finished_at }}</span>
+                </div>
+                {% endif %}
+                <div class="meta-item">
+                    <span class="meta-label">Пользователь:</span>
+                    <span>{{ result.user }}</span>
+                </div>
+            </div>
+            
+            {% if result.status == 'running' %}
+            <!-- Индикатор выполнения -->
+            <div class="running-indicator">
+                <div class="spinner"></div>
+                <p>Скрипт выполняется...</p>
+                <p class="text-muted">Страница обновится автоматически</p>
+            </div>
+            
+            {% else %}
+            
+            {% if result.error %}
+            <!-- Ошибка -->
+            <div class="result-section result-error">
+                <h4>❌ Ошибка</h4>
+                <pre class="output-block error">{{ result.error }}</pre>
+            </div>
+            {% endif %}
+            
+            {% if result.stdout %}
+            <!-- Стандартный вывод -->
+            <div class="result-section">
+                <h4>📤 Стандартный вывод (stdout)</h4>
+                <pre class="output-block">{{ result.stdout }}</pre>
+            </div>
+            {% endif %}
+            
+            {% if result.stderr %}
+            <!-- Вывод ошибок -->
+            <div class="result-section">
+                <h4>⚠️ Вывод ошибок (stderr)</h4>
+                <pre class="output-block stderr">{{ result.stderr }}</pre>
+            </div>
+            {% endif %}
+            
+            {% if not result.stdout and not result.stderr and not result.error %}
+            <div class="empty-state">
+                <p>Скрипт не произвёл вывода</p>
+            </div>
+            {% endif %}
+            
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if result.status == 'running' %}
+<script>
+// Автоматическое обновление статуса
+function checkStatus() {
+    fetch('{{ url_for("scripts.api_result", script_id=script_id) }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'running') {
+                // Перезагружаем страницу когда скрипт завершится
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Проверяем каждые 2 секунды
+setInterval(checkStatus, 2000);
+</script>
+{% endif %}
+{% endblock %}

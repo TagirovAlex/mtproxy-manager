@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — {{ app_name }}{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Статус системы -->
+    <div class="dashboard-section">
+        <h3 class="section-title">Состояние системы</h3>
+        
+        <div class="stats-grid">
+            <!-- CPU -->
+            <div class="stat-card">
+                <div class="stat-icon">💻</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="cpu-percent">{{ system_stats.cpu.percent }}%</span>
+                    <span class="stat-label">CPU</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill {% if system_stats.cpu.percent > 80 %}danger{% elif system_stats.cpu.percent > 60 %}warning{% endif %}" 
+                         style="width: {{ system_stats.cpu.percent }}%"></div>
+                </div>
+            </div>
+            
+            <!-- Память -->
+            <div class="stat-card">
+                <div class="stat-icon">🧠</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="memory-percent">{{ system_stats.memory.percent }}%</span>
+                    <span class="stat-label">Память ({{ system_stats.memory.used_formatted }} / {{ system_stats.memory.total_formatted }})</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill {% if system_stats.memory.percent > 80 %}danger{% elif system_stats.memory.percent > 60 %}warning{% endif %}" 
+                         style="width: {{ system_stats.memory.percent }}%"></div>
+                </div>
+            </div>
+            
+            <!-- Диск -->
+            <div class="stat-card">
+                <div class="stat-icon">💾</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="disk-percent">{{ system_stats.disk.percent }}%</span>
+                    <span class="stat-label">Диск ({{ system_stats.disk.used_formatted }} / {{ system_stats.disk.total_formatted }})</span>
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill {% if system_stats.disk.percent > 90 %}danger{% elif system_stats.disk.percent > 75 %}warning{% endif %}" 
+                         style="width: {{ system_stats.disk.percent }}%"></div>
+                </div>
+            </div>
+            
+            <!-- Аптайм -->
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-content">
+                    <span class="stat-value">{{ system_stats.uptime.uptime_formatted }}</span>
+                    <span class="stat-label">Аптайм сервера</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Статус MTG Proxy -->
+    <div class="dashboard-section">
+        <h3 class="section-title">MTG Proxy</h3>
+        
+        <div class="mtg-panel">
+            <div class="mtg-status-large">
+                <div class="status-indicator-large {% if mtg_status.running %}running{% else %}stopped{% endif %}">
+                    {% if mtg_status.running %}
+                        <span class="status-dot pulse"></span>
+                        <span>Работает</span>
+                    {% else %}
+                        <span class="status-dot"></span>
+                        <span>Остановлен</span>
+                    {% endif %}
+                </div>
+                
+                <div class="mtg-info">
+                    {% if mtg_status.installed %}
+                        <span class="info-item">
+                            <strong>Версия:</strong> {{ mtg_status.version or 'N/A' }}
+                        </span>
+                        {% if mtg_status.running %}
+                        <span class="info-item">
+                            <strong>PID:</strong> {{ mtg_status.pid or 'N/A' }}
+                        </span>
+                        <span class="info-item">
+                            <strong>Запущен:</strong> {{ mtg_status.uptime or 'N/A' }}
+                        </span>
+                        <span class="info-item">
+                            <strong>Подключений:</strong> {{ mtg_status.connections }}
+                        </span>
+                        {% endif %}
+                        <span class="info-item">
+                            <strong>Активных ключей:</strong> {{ mtg_status.active_keys }}
+                        </span>
+                    {% else %}
+                        <span class="info-item warning">MTG не установлен</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="mtg-controls">
+                {% if mtg_status.running %}
+                    <form action="{{ url_for('admin.mtg_stop') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">
+                            <span>⏹️</span> Остановить
+                        </button>
+                    </form>
+                    <form action="{{ url_for('admin.mtg_restart') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-warning">
+                            <span>🔄</span> Перезапустить
+                        </button>
+                    </form>
+                    <form action="{{ url_for('admin.mtg_reload') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-secondary">
+                            <span>📝</span> Обновить конфиг
+                        </button>
+                    </form>
+                {% else %}
+                    <form action="{{ url_for('admin.mtg_start') }}" method="POST" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-success" {% if not mtg_status.installed %}disabled{% endif %}>
+                            <span>▶️</span> Запустить
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if system_health.warnings %}
+        <div class="health-warnings">
+            {% for warning in system_health.warnings %}
+            <div class="warning-item">
+                <span class="warning-icon">⚠️</span>
+                <span>{{ warning }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Статистика -->
+    <div class="dashboard-section">
+        <h3 class="section-title">Статистика</h3>
+        
+        <div class="stats-grid stats-grid-3">
+            <!-- Пользователи -->
+            <div class="stat-card stat-card-detailed">
+                <div class="stat-header">
+                    <span class="stat-icon">👥</span>
+                    <span class="stat-title">Пользователи</span>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-row">
+                        <span>Всего:</span>
+                        <strong>{{ users_stats.total }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Активных:</span>
+                        <strong>{{ users_stats.approved }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Ожидают подтверждения:</span>
+                        <strong class="{% if users_stats.pending > 0 %}text-warning{% endif %}">{{ users_stats.pending }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Заблокировано:</span>
+                        <strong>{{ users_stats.blocked }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Администраторов:</span>
+                        <strong>{{ users_stats.admins }}</strong>
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <a href="{{ url_for('admin.users_list') }}" class="btn btn-sm btn-link">Управление →</a>
+                </div>
+            </div>
+            
+            <!-- Ключи -->
+            <div class="stat-card stat-card-detailed">
+                <div class="stat-header">
+                    <span class="stat-icon">🔑</span>
+                    <span class="stat-title">Ключи</span>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-row">
+                        <span>Всего:</span>
+                        <strong>{{ keys_stats.total }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Активных:</span>
+                        <strong class="text-success">{{ keys_stats.active }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Заблокировано:</span>
+                        <strong>{{ keys_stats.blocked }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>С лимитом трафика:</span>
+                        <strong>{{ keys_stats.with_limit }}</strong>
+                    </div>
+                </div>
+                <div class="stat-footer">
+                    <a href="{{ url_for('keys.list_keys') }}" class="btn btn-sm btn-link">Управление →</a>
+                </div>
+            </div>
+            
+            <!-- Трафик -->
+            <div class="stat-card stat-card-detailed">
+                <div class="stat-header">
+                    <span class="stat-icon">📊</span>
+                    <span class="stat-title">Трафик</span>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-row">
+                        <span>Всего:</span>
+                        <strong>{{ traffic_stats.total_traffic_formatted }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>За текущий период:</span>
+                        <strong>{{ traffic_stats.current_period_formatted }}</strong>
+                    </div>
+                    <div class="stat-row">
+                        <span>Активных ключей:</span>
+                        <strong>{{ traffic_stats.active_keys }}</strong>
+                    </div>
+                    {% if traffic_stats.last_activity %}
+                    <div class="stat-row">
+                        <span>Последняя активность:</span>
+                        <strong>{{ traffic_stats.last_activity[:16] }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Последние попытки входа -->
+    <div class="dashboard-section">
+        <h3 class="section-title">Последние попытки входа</h3>
+        
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Email</th>
+                        <th>IP адрес</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for attempt in recent_logins %}
+                    <tr>
+                        <td>{{ attempt.timestamp.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                        <td>{{ attempt.email or '—' }}</td>
+                        <td><code>{{ attempt.ip_address }}</code></td>
+                        <td>
+                            {% if attempt.success %}
+                                <span class="badge badge-success">Успешно</span>
+                            {% else %}
+                                <span class="badge badge-danger">Неудачно</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">Нет данных</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Автообновление статистики каждые 30 секунд
+setInterval(function() {
+    fetch('{{ url_for("admin.api_system_stats") }}')
+        .then(response => response.json())
+        .then(data => {
+            // Обновление CPU
+            document.getElementById('cpu-percent').textContent = data.system.cpu.percent + '%';
+            
+            // Обновление памяти
+            document.getElementById('memory-percent').textContent = data.system.memory.percent + '%';
+            
+            // Обновление диска
+            document.getElementById('disk-percent').textContent = data.system.disk.percent + '%';
+            
+            // Обновление статуса MTG
+            updateMtgStatus(data.mtg);
+        })
+        .catch(error => console.error('Error updating stats:', error));
+}, 30000);
+
+function updateMtgStatus(mtg) {
+    const widget = document.getElementById('mtg-status-widget');
+    if (widget) {
+        const indicator = widget.querySelector('.status-indicator');
+        if (indicator) {
+            indicator.className = 'status-indicator ' + (mtg.running ? 'running' : 'stopped');
+            indicator.textContent = mtg.running ? 'Работает' : 'Остановлен';
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Ожидание подтверждения — {{ app_name }}{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <div class="pending-icon">⏳</div>
+        <h1 class="auth-title">Ожидание подтверждения</h1>
+    </div>
+    
+    <div class="auth-body">
+        <p class="pending-message">
+            Ваш аккаунт успешно создан, но ещё не подтверждён администратором.
+        </p>
+        <p class="pending-info">
+            Пожалуйста, свяжитесь с администратором для активации вашего аккаунта или дождитесь подтверждения.
+        </p>
+    </div>
+    
+    <div class="auth-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-secondary btn-block">
+            Вернуться к входу
+        </a>
+    </div>
+</div>
+{% endblock %}

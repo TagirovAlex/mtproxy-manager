@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Доступ запрещён — {{ app_name }}{% endblock %}
+
+{% block page_title %}Ошибка 403{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-card">
+        <div class="error-icon">🚫</div>
+        <h1 class="error-code">403</h1>
+        <h2 class="error-title">Доступ запрещён</h2>
+        <p class="error-message">
+            У вас нет прав для доступа к этой странице.
+        </p>
+        <div class="error-details">
+            <p>Возможные причины:</p>
+            <ul>
+                <li>Страница доступна только администраторам</li>
+                <li>Ваш аккаунт не имеет необходимых прав</li>
+                <li>Ресурс принадлежит другому пользователю</li>
+            </ul>
+        </div>
+        <div class="error-actions">
+            <a href="{{ url_for('auth.index') }}" class="btn btn-primary">
+                🏠 На главную
+            </a>
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                ← Назад
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block auth_content %}
+<div class="error-card">
+    <div class="error-icon">🚫</div>
+    <h1 class="error-code">403</h1>
+    <h2 class="error-title">Доступ запрещён</h2>
+    <p class="error-message">
+        У вас нет прав для доступа к этой странице.
+    </p>
+    <div class="error-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+            🔐 Войти в систему
+        </a>
+    </div>
+</div>
+{% endblock %}

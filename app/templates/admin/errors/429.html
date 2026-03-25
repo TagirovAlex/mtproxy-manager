@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Слишком много запросов — {{ app_name }}{% endblock %}
+
+{% block page_title %}Ошибка 429{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-card">
+        <div class="error-icon">⏱️</div>
+        <h1 class="error-code">429</h1>
+        <h2 class="error-title">Слишком много запросов</h2>
+        <p class="error-message">
+            Вы отправили слишком много запросов за короткий промежуток времени.
+        </p>
+        <div class="error-details">
+            <p>Это ограничение введено для защиты системы.</p>
+            <p>Пожалуйста, подождите несколько минут и попробуйте снова.</p>
+        </div>
+        <div class="error-countdown">
+            <p>Попробуйте снова через:</p>
+            <div class="countdown-timer" id="countdown">
+                <span class="countdown-value">60</span>
+                <span class="countdown-label">секунд</span>
+            </div>
+        </div>
+        <div class="error-actions">
+            <a href="{{ url_for('auth.index') }}" class="btn btn-primary" id="retry-btn" disabled>
+                🔄 Попробовать снова
+            </a>
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                ← Назад
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block auth_content %}
+<div class="error-card">
+    <div class="error-icon">⏱️</div>
+    <h1 class="error-code">429</h1>
+    <h2 class="error-title">Слишком много запросов</h2>
+    <p class="error-message">
+        Вы отправили слишком много запросов. Пожалуйста, подождите.
+    </p>
+    <div class="error-countdown">
+        <p>Попробуйте снова через:</p>
+        <div class="countdown-timer" id="countdown-auth">
+            <span class="countdown-value">60</span>
+            <span class="countdown-label">секунд</span>
+        </div>
+    </div>
+    <div class="error-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary" id="retry-btn-auth" disabled>
+            🔄 Попробовать снова
+        </a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let seconds = 60;
+    const countdownEl = document.querySelector('#countdown-auth .countdown-value') || 
+                        document.querySelector('#countdown .countdown-value');
+    const retryBtn = document.getElementById('retry-btn-auth') || 
+                     document.getElementById('retry-btn');
+    
+    const timer = setInterval(function() {
+        seconds--;
+        if (countdownEl) {
+            countdownEl.textContent = seconds;
+        }
+        
+        if (seconds <= 0) {
+            clearInterval(timer);
+            if (retryBtn) {
+                retryBtn.removeAttribute('disabled');
+                retryBtn.classList.add('btn-success');
+            }
+            if (countdownEl) {
+                countdownEl.parentElement.innerHTML = '<span class="text-success">��ожно продолжить!</span>';
+            }
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let seconds = 60;
+    const countdownEl = document.querySelector('#countdown .countdown-value');
+    const retryBtn = document.getElementById('retry-btn');
+    
+    const timer = setInterval(function() {
+        seconds--;
+        if (countdownEl) {
+            countdownEl.textContent = seconds;
+        }
+        
+        if (seconds <= 0) {
+            clearInterval(timer);
+            if (retryBtn) {
+                retryBtn.removeAttribute('disabled');
+                retryBtn.classList.add('btn-success');
+            }
+            if (countdownEl) {
+                countdownEl.parentElement.innerHTML = '<span class="text-success">Можно продолжить!</span>';
+            }
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}

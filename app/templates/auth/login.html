@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Вход — {{ app_name }}{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+    <div class="auth-header">
+        <h1 class="auth-logo">MTProxy Manager</h1>
+        <p class="auth-subtitle">Войдите в свой аккаунт</p>
+    </div>
+    
+    <form method="POST" action="{{ url_for('auth.login') }}" class="auth-form">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" 
+                   id="email" 
+                   name="email" 
+                   class="form-input {% if form.email.errors %}is-invalid{% endif %}"
+                   value="{{ form.email.data or '' }}"
+                   placeholder="your@email.com"
+                   autocomplete="email"
+                   required 
+                   autofocus>
+            {% if form.email.errors %}
+                {% for error in form.email.errors %}
+                <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="password" class="form-label">Пароль</label>
+            <div class="password-input-wrapper">
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       class="form-input {% if form.password.errors %}is-invalid{% endif %}"
+                       placeholder="••••••••"
+                       autocomplete="current-password"
+                       required>
+                <button type="button" class="password-toggle" aria-label="Показать пароль">
+                    <span class="eye-icon">👁️</span>
+                </button>
+            </div>
+            {% if form.password.errors %}
+                {% for error in form.password.errors %}
+                <span class="form-error">{{ error }}</span>
+                {% endfor %}
+            {% endif %}
+        </div>
+        
+        <div class="form-group form-group-checkbox">
+            <label class="checkbox-label">
+                <input type="checkbox" name="remember_me" {{ 'checked' if form.remember_me.data else '' }}>
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-text">Запомнить меня</span>
+            </label>
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block">
+            Войти
+        </button>
+    </form>
+    
+    <div class="auth-footer">
+        <p>Нет аккаунта? <a href="{{ url_for('auth.register') }}">Зарегистр��роваться</a></p>
+    </div>
+</div>
+
+<div class="auth-info">
+    <p>🔒 Защищённое соединение</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Переключение видимости пароля
+    const toggleBtn = document.querySelector('.password-toggle');
+    const passwordInput = document.getElementById('password');
+    
+    if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function() {
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+            this.querySelector('.eye-icon').textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Скрипты — {{ app_name }}{% endblock %}
+
+{% block page_title %}Скрипты{% endblock %}
+
+{% block content %}
+<div class="scripts-page">
+    <!-- Информационное предупреждение -->
+    <div class="alert alert-warning">
+        <strong>⚠️ Внимание!</strong> Скрипты выполняются с правами приложения на сервере. 
+        Убедитесь, что скрипты безопасны перед выполнением.
+    </div>
+    
+    <!-- Выполняющиеся скрипты -->
+    {% if running_scripts %}
+    <div class="card card-warning">
+        <div class="card-header">
+            <h3>🔄 Выполняются сейчас</h3>
+        </div>
+        <div class="card-body">
+            <ul class="running-scripts-list">
+                {% for script_id, info in running_scripts.items() %}
+                <li>
+                    <span class="script-name">{{ info.script_name }}</span>
+                    <span class="script-status">запущен {{ info.started_at }}</span>
+                    <a href="{{ url_for('scripts.result', script_id=script_id) }}" class="btn btn-sm btn-secondary">
+                        Просмотр
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Список скриптов -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📜 Доступные скрипты</h3>
+            <span class="card-header-hint">Папка: <code>scripts/</code></span>
+        </div>
+        <div class="card-body">
+            {% if scripts %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Имя файла</th>
+                            <th>Описание</th>
+                            <th>Размер</th>
+                            <th>Изменён</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for script in scripts %}
+                        <tr>
+                            <td>
+                                <code class="script-filename">{{ script.name }}</code>
+                                {% if script.executable %}
+                                <span class="badge badge-success" title="Исполняемый">+x</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if script.description %}
+                                    {{ script.description }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ script.size }} байт</td>
+                            <td>{{ script.modified.strftime('%d.%m.%Y %H:%M') }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('scripts.view_script', script_name=script.name) }}" 
+                                       class="btn btn-sm btn-secondary" title="Просмотр">
+                                        👁️
+                                    </a>
+                                    <form action="{{ url_for('scripts.run_script', script_name=script.name) }}" 
+                                          method="POST" 
+                                          class="inline-form"
+                                          onsubmit="return confirm('Выполнить скрипт {{ script.name }}?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-primary" title="Запустить">
+                                            ▶️ Выполнить
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <h4>Скрипты не найдены</h4>
+                <p>Поместите скрипты (.sh, .py, .bash) в папку <code>scripts/</code></p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- История выполнения -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📋 История выполнения</h3>
+            <a href="{{ url_for('scripts.history') }}" class="btn btn-sm btn-secondary">
+                Вся история
+            </a>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                Перейдите в <a href="{{ url_for('scripts.history') }}">историю выполнения</a> 
+                для просмотра результатов выполненных скриптов.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Инструкции -->
+    <div class="card card-info">
+        <div class="card-header">
+            <h3>📖 Инструкции</h3>
+        </div>
+        <div class="card-body">
+            <div class="instructions">
+                <h4>Добавление скриптов</h4>
+                <ol>
+                    <li>Создайте файл скрипта с расширением <code>.sh</code>, <code>.bash</code> или <code>.py</code></li>
+                    <li>Поместите файл в папку <code>scripts/</code></li>
+                    <li>Добавьте описание в первую строку комментария: <code># Описание скрипта</code></li>
+                    <li>Для shell-скриптов сделайте файл исполняемым: <code>chmod +x script.sh</code></li>
+                </ol>
+                
+                <h4>Примеры</h4>
+                <div class="code-example">
+                    <strong>Bash скрипт (example.sh):</strong>
+                    <pre><code>#!/bin/bash
+# Пример скрипта - выводит информацию о системе
+
+echo "=== Информация о системе ==="
+uname -a
+echo ""
+echo "=== Свободное место ==="
+df -h
+echo ""
+echo "=== Память ==="
+free -m</code></pre>
+                </div>
+                
+                <div class="code-example">
+                    <strong>Python скрипт (example.py):</strong>
+                    <pre><code>#!/usr/bin/env python3
+# Пример Python скрипта
+
+import sys
+import platform
+
+print("Python версия:", sys.version)
+print("Платформа:", platform.platform())</code></pre>
+                </div>
+                
+                <h4>Ограничения</h4>
+                <ul>
+                    <li>Максимальное время выполнения: 5 минут</li>
+                    <li>Скрипты выполняются от имени пользователя приложения</li>
+                    <li>Для команд с sudo требуется настройка sudoers</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

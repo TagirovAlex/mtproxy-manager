@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Внутренняя ошибка — {{ app_name }}{% endblock %}
+
+{% block page_title %}Ошибка 500{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-card">
+        <div class="error-icon">💥</div>
+        <h1 class="error-code">500</h1>
+        <h2 class="error-title">Внутренняя ошибка сервера</h2>
+        <p class="error-message">
+            Произошла непредвиденная ошибка. Мы уже работаем над её устранением.
+        </p>
+        <div class="error-details">
+            <p>Что можно сделать:</p>
+            <ul>
+                <li>Обновите страницу через несколько секунд</li>
+                <li>Вернитесь на главную страницу</li>
+                <li>Если ошибка повторяется, обратитесь к администратору</li>
+            </ul>
+        </div>
+        <div class="error-actions">
+            <a href="{{ url_for('auth.index') }}" class="btn btn-primary">
+                🏠 На главную
+            </a>
+            <button onclick="location.reload()" class="btn btn-secondary">
+                🔄 Обновить страницу
+            </button>
+        </div>
+        
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <div class="error-admin-info">
+            <h4>Информация для администратора:</h4>
+            <p>Проверьте логи приложения:</p>
+            <code>logs/mtproxy-manager.log</code>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block auth_content %}
+<div class="error-card">
+    <div class="error-icon">💥</div>
+    <h1 class="error-code">500</h1>
+    <h2 class="error-title">Внутренняя ошибка сервера</h2>
+    <p class="error-message">
+        Произошла непредвиденная ошибка. Попробуйте позже.
+    </p>
+    <div class="error-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+            🏠 На главную
+        </a>
+        <button onclick="location.reload()" class="btn btn-secondary">
+            🔄 Обновить
+        </button>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Страница не найдена — {{ app_name }}{% endblock %}
+
+{% block page_title %}Ошибка 404{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-card">
+        <div class="error-icon">🔍</div>
+        <h1 class="error-code">404</h1>
+        <h2 class="error-title">Страница не найдена</h2>
+        <p class="error-message">
+            Запрашиваемая страница не существует или была удалена.
+        </p>
+        <div class="error-details">
+            <p>Что можно сделать:</p>
+            <ul>
+                <li>Проверьте правильность введённого адреса</li>
+                <li>Вернитесь на главную страницу</li>
+                <li>Воспользуйтесь навигацией слева</li>
+            </ul>
+        </div>
+        <div class="error-actions">
+            <a href="{{ url_for('auth.index') }}" class="btn btn-primary">
+                🏠 На главную
+            </a>
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                ← Назад
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block auth_content %}
+<div class="error-card">
+    <div class="error-icon">🔍</div>
+    <h1 class="error-code">404</h1>
+    <h2 class="error-title">Страница не найдена</h2>
+    <p class="error-message">
+        Запрашиваемая страница не существует или была удалена.
+    </p>
+    <div class="error-actions">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+            🏠 На главную
+        </a>
+    </div>
+</div>
+{% endblock %}

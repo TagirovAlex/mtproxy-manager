@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Просмотр: {{ script_name }} — {{ app_name }}{% endblock %}
+
+{% block page_title %}Просмотр скрипта{% endblock %}
+
+{% block content %}
+<div class="script-view-page">
+    <div class="page-header">
+        <div class="header-left">
+            <a href="{{ url_for('scripts.index') }}" class="btn btn-secondary">
+                ← К списку скриптов
+            </a>
+        </div>
+        <div class="header-right">
+            <form action="{{ url_for('scripts.run_script', script_name=script_name) }}" 
+                  method="POST" 
+                  class="inline-form"
+                  onsubmit="return confirm('Выполнить скрипт {{ script_name }}?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary">
+                    ▶️ Выполнить скрипт
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>
+                <code>{{ script_name }}</code>
+            </h3>
+            <div class="card-header-actions">
+                <button class="btn btn-sm btn-secondary" onclick="copyToClipboard()" title="Копировать содержимое">
+                    📋 Копировать
+                </button>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <div class="code-viewer">
+                <div class="code-header">
+                    <span class="code-lang">
+                        {% if script_name.endswith('.py') %}
+                            Python
+                        {% elif script_name.endswith('.sh') %}
+                            Bash
+                        {% elif script_name.endswith('.bash') %}
+                            Bash
+                        {% else %}
+                            Script
+                        {% endif %}
+                    </span>
+                    <span class="code-lines">{{ content.count('\n') + 1 }} строк</span>
+                </div>
+                <pre class="code-content" id="script-content"><code>{{ content }}</code></pre>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Информация о файле -->
+    <div class="card card-info">
+        <div class="card-header">
+            <h3>ℹ️ Информация</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">Путь:</span>
+                    <code>scripts/{{ script_name }}</code>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Размер:</span>
+                    <span>{{ content|length }} байт</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyToClipboard() {
+    const content = document.getElementById('script-content').textContent;
+    navigator.clipboard.writeText(content).then(function() {
+        // Показываем уведомление
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✓ Скопировано';
+        btn.classList.add('btn-success');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Ошибка копирования:', err);
+        alert('Не удалось скопировать в буфер обмена');
+    });
+}
+</script>
+{% endblock %}

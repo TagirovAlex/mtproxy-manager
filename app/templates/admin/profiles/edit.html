@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Мой профиль — {{ app_name }}{% endblock %}
+
+{% block page_title %}Мой профиль{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+    <div class="page-grid">
+        <!-- Основная форма -->
+        <div class="page-main">
+            <div class="card">
+                <div class="card-header">
+                    <h3>👤 Настройки профиля</h3>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('profile.edit') }}" class="form-profile">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Email -->
+                        <div class="form-section">
+                            <h4>Email</h4>
+                            
+                            <div class="form-group">
+                                <label for="email" class="form-label">Email адрес</label>
+                                <input type="email" 
+                                       id="email" 
+                                       name="email" 
+                                       class="form-input {% if form.email.errors %}is-invalid{% endif %}"
+                                       value="{{ form.email.data or '' }}"
+                                       required>
+                                {% if form.email.errors %}
+                                    {% for error in form.email.errors %}
+                                    <span class="form-error">{{ error }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Смена пароля -->
+                        <div class="form-section">
+                            <h4>Смена пароля</h4>
+                            <p class="form-section-hint">Оставьте поля пустыми, если не хотите менять пароль</p>
+                            
+                            <div class="form-group">
+                                <label for="current_password" class="form-label">Текущий пароль</label>
+                                <div class="password-input-wrapper">
+                                    <input type="password" 
+                                           id="current_password" 
+                                           name="current_password" 
+                                           class="form-input {% if form.current_password.errors %}is-invalid{% endif %}"
+                                           autocomplete="current-password">
+                                    <button type="button" class="password-toggle" data-target="current_password">
+                                        <span class="eye-icon">👁️</span>
+                                    </button>
+                                </div>
+                                {% if form.current_password.errors %}
+                                    {% for error in form.current_password.errors %}
+                                    <span class="form-error">{{ error }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="new_password" class="form-label">Новый пароль</label>
+                                <div class="password-input-wrapper">
+                                    <input type="password" 
+                                           id="new_password" 
+                                           name="new_password" 
+                                           class="form-input {% if form.new_password.errors %}is-invalid{% endif %}"
+                                           minlength="8"
+                                           autocomplete="new-password">
+                                    <button type="button" class="password-toggle" data-target="new_password">
+                                        <span class="eye-icon">👁️</span>
+                                    </button>
+                                </div>
+                                {% if form.new_password.errors %}
+                                    {% for error in form.new_password.errors %}
+                                    <span class="form-error">{{ error }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                                <span class="form-hint">Минимум 8 символов</span>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="new_password2" class="form-label">Подтверждение нового пароля</label>
+                                <div class="password-input-wrapper">
+                                    <input type="password" 
+                                           id="new_password2" 
+                                           name="new_password2" 
+                                           class="form-input {% if form.new_password2.errors %}is-invalid{% endif %}"
+                                           autocomplete="new-password">
+                                    <button type="button" class="password-toggle" data-target="new_password2">
+                                        <span class="eye-icon">👁️</span>
+                                    </button>
+                                </div>
+                                {% if form.new_password2.errors %}
+                                    {% for error in form.new_password2.errors %}
+                                    <span class="form-error">{{ error }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                💾 Сохранить изменения
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- История входов -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🕐 Последние входы</h3>
+                    <a href="{{ url_for('profile.sessions') }}" class="btn btn-sm btn-secondary">
+                        Вся история
+                    </a>
+                </div>
+                
+                <div class="card-body">
+                    {% if recent_logins %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Время</th>
+                                    <th>IP адрес</th>
+                                    <th>Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for attempt in recent_logins %}
+                                <tr>
+                                    <td>{{ attempt.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                                    <td><code>{{ attempt.ip_address }}</code></td>
+                                    <td>
+                                        {% if attempt.success %}
+                                            <span class="badge badge-success">Успешно</span>
+                                        {% else %}
+                                            <span class="badge badge-danger">Неудачно</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Нет данных о входах</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Боковая панель -->
+        <div class="page-sidebar">
+            <!-- Статистика -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📊 Статистика</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stats-list">
+                        <div class="stat-item-row">
+                            <span class="stat-label">Ключей:</span>
+                            <span class="stat-value">{{ user_stats.keys_count }}</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-label">Активных:</span>
+                            <span class="stat-value">{{ user_stats.active_keys }}</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-label">Общий трафик:</span>
+                            <span class="stat-value">{{ user_stats.total_traffic_formatted }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Информация об аккаунте -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>ℹ️ Аккаунт</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">Статус:</span>
+                            <span class="badge {% if current_user.is_admin %}badge-admin{% else %}badge-success{% endif %}">
+                                {{ current_user.get_status() }}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Регистрация:</span>
+                            <span>{{ user_stats.created_at.strftime('%d.%m.%Y') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Последний вход:</span>
+                            <span>
+                                {% if user_stats.last_login %}
+                                    {{ user_stats.last_login.strftime('%d.%m.%Y %H:%M') }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Быстрые ссылки -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔗 Быстрые ссылки</h3>
+                </div>
+                <div class="card-body">
+                    <div class="quick-links">
+                        {% if not current_user.is_admin %}
+                        <a href="{{ url_for('profile.my_keys') }}" class="btn btn-secondary btn-block">
+                            🔑 Мои ключи
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('keys.create_key') }}" class="btn btn-secondary btn-block">
+                            ➕ Создать ключ
+                        </a>
+                        <a href="{{ url_for('profile.sessions') }}" class="btn btn-secondary btn-block">
+                            📜 История входов
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Переключение видимости пароля
+    document.querySelectorAll('.password-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            if (input) {
+                const type = input.type === 'password' ? 'text' : 'password';
+                input.type = type;
+                this.querySelector('.eye-icon').textContent = type === 'password' ? '👁️' : '🙈';
+            }
+        });
+    });
+    
+    // Валидация совпадения паролей
+    const newPassword = document.getElementById('new_password');
+    const newPassword2 = document.getElementById('new_password2');
+    
+    function checkPasswords() {
+        if (newPassword2.value && newPassword.value !== newPassword2.value) {
+            newPassword2.setCustomValidity('Пароли не совпадают');
+        } else {
+            newPassword2.setCustomValidity('');
+        }
+    }
+    
+    newPassword.addEventListener('input', checkPasswords);
+    newPassword2.addEventListener('input', checkPasswords);
+});
+</script>
+{% endblock %}

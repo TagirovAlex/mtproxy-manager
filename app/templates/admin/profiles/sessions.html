@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}История входов — {{ app_name }}{% endblock %}
+
+{% block page_title %}История входов{% endblock %}
+
+{% block content %}
+<div class="sessions-page">
+    <div class="page-header">
+        <a href="{{ url_for('profile.edit') }}" class="btn btn-secondary">
+            ← К профилю
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>🕐 История попыток входа</h3>
+        </div>
+        
+        <div class="card-body">
+            {% if attempts.items %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Дата и время</th>
+                            <th>IP адрес</th>
+                            <th>Статус</th>
+                            <th>User Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for attempt in attempts.items %}
+                        <tr class="{% if not attempt.success %}row-danger{% endif %}">
+                            <td>
+                                <span class="datetime">
+                                    {{ attempt.timestamp.strftime('%d.%m.%Y') }}
+                                    <span class="time">{{ attempt.timestamp.strftime('%H:%M:%S') }}</span>
+                                </span>
+                            </td>
+                            <td>
+                                <code class="ip-address">{{ attempt.ip_address }}</code>
+                            </td>
+                            <td>
+                                {% if attempt.success %}
+                                    <span class="badge badge-success">✓ Успешно</span>
+                                {% else %}
+                                    <span class="badge badge-danger">✗ Неудачно</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="user-agent" title="{{ attempt.user_agent or '' }}">
+                                    {% if attempt.user_agent %}
+                                        {{ attempt.user_agent[:50] }}{% if attempt.user_agent|length > 50 %}...{% endif %}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Пагинация -->
+            {% if attempts.pages > 1 %}
+            <nav class="pagination-nav">
+                <ul class="pagination">
+                    {% if attempts.has_prev %}
+                    <li>
+                        <a href="{{ url_for('profile.sessions', page=attempts.prev_num) }}" 
+                           class="page-link">← Назад</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in attempts.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li class="{% if page_num == attempts.page %}active{% endif %}">
+                                <a href="{{ url_for('profile.sessions', page=page_num) }}" 
+                                   class="page-link">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if attempts.has_next %}
+                    <li>
+                        <a href="{{ url_for('profile.sessions', page=attempts.next_num) }}" 
+                           class="page-link">Вперёд →</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <h4>История пуста</h4>
+                <p>Здесь будут отображаться ваши попытки входа в систему</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Информация о безопасности -->
+    <div class="card card-info">
+        <div class="card-header">
+            <h3>🔒 Информация о безопасности</h3>
+        </div>
+        <div class="card-body">
+            <div class="security-info">
+                <div class="security-item">
+                    <span class="security-icon">⚠️</span>
+                    <div class="security-content">
+                        <strong>Подозрительная активность</strong>
+                        <p>Если вы видите входы с незнакомых IP-адресов, немедленно смените пароль.</p>
+                    </div>
+                </div>
+                <div class="security-item">
+                    <span class="security-icon">🔐</span>
+                    <div class="security-content">
+                        <strong>Защита аккаунта</strong>
+                        <p>Используйте сложный пароль длиной не менее 8 символов с буквами, цифрами и специальными символами.</p>
+                    </div>
+                </div>
+                <div class="security-item">
+                    <span class="security-icon">🚫</span>
+                    <div class="security-content">
+                        <strong>Блокировка при подборе</strong>
+                        <p>После 5 неудачных попыток входа аккаунт временно блокируется на 15 минут.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

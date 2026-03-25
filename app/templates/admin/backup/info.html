@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Бэкап: {{ backup.filename }} — {{ app_name }}{% endblock %}
+
+{% block page_title %}Информация о бэкапе{% endblock %}
+
+{% block content %}
+<div class="backup-info-page">
+    <div class="page-header">
+        <a href="{{ url_for('backup.index') }}" class="btn btn-secondary">
+            ← К списку бэкапов
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h3>📦 {{ backup.filename }}</h3>
+            {% if not backup.exists %}
+                <span class="badge badge-danger">Файл не найден</span>
+            {% endif %}
+        </div>
+        
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-block">
+                    <h4>Основная информация</h4>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-label">ID:</span>
+                            <span>{{ backup.id }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Имя файла:</span>
+                            <code>{{ backup.filename }}</code>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Путь:</span>
+                            <code>{{ backup.filepath }}</code>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Размер:</span>
+                            <span>{{ backup.size_formatted }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Тип:</span>
+                            <span class="badge {% if backup.backup_type == 'auto' %}badge-info{% else %}badge-secondary{% endif %}">
+                                {% if backup.backup_type == 'auto' %}Автоматический{% else %}Ручной{% endif %}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Дата создания:</span>
+                            <span>{{ backup.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Файл существует:</span>
+                            {% if backup.exists %}
+                                <span class="text-success">✓ Да</span>
+                            {% else %}
+                                <span class="text-danger">✗ Нет</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if backup.notes %}
+                <div class="info-block">
+                    <h4>Примечание</h4>
+                    <p class="backup-notes">{{ backup.notes }}</p>
+                </div>
+                {% endif %}
+                
+                {% if backup.contents %}
+                <div class="info-block">
+                    <h4>Содержимое архива</h4>
+                    <div class="file-list">
+                        {% for file in backup.contents %}
+                        <div class="file-item">
+                            <span class="file-icon">
+                                {% if file.endswith('/') %}📁{% else %}📄{% endif %}
+                            </span>
+                            <code>{{ file }}</code>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card-footer">
+            <div class="action-buttons">
+                {% if backup.exists %}
+                <a href="{{ url_for('backup.download', backup_id=backup.id) }}" class="btn btn-primary">
+                    ⬇️ Скачать
+                </a>
+                
+                <form action="{{ url_for('backup.restore', backup_id=backup.id) }}" 
+                      method="POST" 
+                      class="inline-form"
+                      onsubmit="return confirm('Восстановить из этого бэкапа?\n\nВНИМАНИЕ: Текущие данные будут перезаписаны!\nПосле восстановления перезапустите приложение.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-warning">
+                        🔄 Восстановить
+                    </button>
+                </form>
+                {% endif %}
+                
+                <form action="{{ url_for('backup.delete', backup_id=backup.id) }}" 
+                      method="POST" 
+                      class="inline-form"
+                      onsubmit="return confirm('Удалить этот бэкап? Это действие необратимо!');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        🗑️ Удалить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Предупреждение о восстановлении -->
+    <div class="card card-warning">
+        <div class="card-header">
+            <h3>⚠️ Важно при восстановлении</h3>
+        </div>
+        <div class="card-body">
+            <ul class="warning-list">
+                <li>Восстановление <strong>перезапишет</strong> текущие данные</li>
+                <li>Рекомендуется создать бэкап текущего состояния перед восстановлением</li>
+                <li>После восстановления <strong>обязательно перезапустите</strong> приложение</li>
+                <li>Если восстановление не удалось, проверьте логи в <code>logs/</code></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

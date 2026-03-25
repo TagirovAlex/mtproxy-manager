@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Мои ключи — {{ app_name }}{% endblock %}
+
+{% block page_title %}Мои ключи{% endblock %}
+
+{% block content %}
+<div class="my-keys-page">
+    <div class="page-header">
+        <div class="header-left">
+            <a href="{{ url_for('profile.edit') }}" class="btn btn-secondary">
+                ← К профилю
+            </a>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">
+                ➕ Создать ключ
+            </a>
+        </div>
+    </div>
+    
+    {% if keys %}
+    <div class="keys-grid">
+        {% for key in keys %}
+        <div class="key-card {% if key.is_blocked %}blocked{% elif not key.is_active %}inactive{% endif %}">
+            <div class="key-card-header">
+                <h3 class="key-name">{{ key.name }}</h3>
+                <span class="badge {% if key.is_blocked %}badge-danger{% elif not key.is_active %}badge-secondary{% elif key.check_traffic_limit() %}badge-warning{% else %}badge-success{% endif %}">
+                    {{ key.get_status() }}
+                </span>
+            </div>
+            
+            <div class="key-card-body">
+                <div class="key-info">
+                    <div class="info-row">
+                        <span class="info-label">Домен:</span>
+                        <code>{{ key.fake_tls_domain }}</code>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Трафик:</span>
+                        <span>{{ key.format_traffic(key.total_traffic) }}</span>
+                    </div>
+                    {% if key.traffic_limit %}
+                    <div class="info-row">
+                        <span class="info-label">Лимит:</span>
+                        <span>{{ key.format_traffic(key.traffic_used) }} / {{ key.format_traffic(key.traffic_limit) }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <span class="info-label">Активность:</span>
+                        <span>
+                            {% if key.last_activity %}
+                                {{ key.last_activity.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Ссылки -->
+                <div class="key-links">
+                    <div class="link-group">
+                        <label>tg:// ссылка:</label>
+                        <div class="link-copy-row">
+                            <input type="text" 
+                                   class="form-input form-input-sm" 
+                                   value="{{ key.get_tg_link(server_domain, mtg_port) }}" 
+                                   readonly
+                                   id="tg-link-{{ key.id }}">
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary copy-btn" 
+                                    data-target="tg-link-{{ key.id }}">
+                                📋
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="link-group">
+                        <label>HTTPS ссылка:</label>
+                        <div class="link-copy-row">
+                            <input type="text" 
+                                   class="form-input form-input-sm" 
+                                   value="{{ key.get_https_link(server_domain, mtg_port) }}" 
+                                   readonly
+                                   id="https-link-{{ key.id }}">
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary copy-btn" 
+                                    data-target="https-link-{{ key.id }}">
+                                📋
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="key-card-footer">
+                <a href="{{ url_for('keys.key_detail', key_id=key.id) }}" class="btn btn-sm btn-secondary">
+                    Подробнее
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% else %}
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-icon">🔑</div>
+                <h4>У вас пока нет ключей</h4>
+                <p>Создайте первый ключ для подключения к прокси</p>
+                <a href="{{ url_for('keys.create_key') }}" class="btn btn-primary">
+                    ➕ Создать ключ
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Инструкция -->
+    <div class="card card-info">
+        <div class="card-header">
+            <h3>📖 Как использовать</h3>
+        </div>
+        <div class="card-body">
+            <div class="instructions">
+                <div class="instruction-step">
+                    <span class="step-number">1</span>
+                    <div class="step-content">
+                        <strong>Скопируйте ссылку</strong>
+                        <p>Нажмите кнопку 📋 рядом с любой ссылкой</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <span class="step-number">2</span>
+                    <div class="step-content">
+                        <strong>Откройте ссылку</strong>
+                        <p>Откройте ссылку в браузере или отправьте себе в Telegram</p>
+                    </div>
+                </div>
+                <div class="instruction-step">
+                    <span class="step-number">3</span>
+                    <div class="step-content">
+                        <strong>Подключитесь</strong>
+                        <p>Telegram автоматически предложит добавить прокси в настройки</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tips">
+                <h4>💡 Советы</h4>
+                <ul>
+                    <li><strong>tg:// ссылка</strong> — лучше работает на мобильных устройствах</li>
+                    <li><strong>HTTPS ссылка</strong> — универсальная, работает везде</li>
+                    <li>Для каждого устройства рекомендуется использовать отдельный ключ</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Копирование ссылок
+    document.querySelectorAll('.copy-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            
+            navigator.clipboard.writeText(input.value).then(function() {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✓';
+                btn.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                }, 1500);
+            }).catch(function(err) {
+                // Fallback для старых браузеров
+                input.select();
+                document.execCommand('copy');
+                
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✓';
+                setTimeout(function() {
+                    btn.innerHTML = originalText;
+                }, 1500);
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

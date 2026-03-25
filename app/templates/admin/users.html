@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователи — {{ app_name }}{% endblock %}
+
+{% block page_title %}Пользователи{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-actions">
+        <!-- Фильтры -->
+        <div class="filters">
+            <a href="{{ url_for('admin.users_list', status='all') }}" 
+               class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Все
+            </a>
+            <a href="{{ url_for('admin.users_list', status='pending') }}" 
+               class="btn btn-sm {% if status_filter == 'pending' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Ожидают подтверждения
+            </a>
+            <a href="{{ url_for('admin.users_list', status='approved') }}" 
+               class="btn btn-sm {% if status_filter == 'approved' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Активные
+            </a>
+            <a href="{{ url_for('admin.users_list', status='blocked') }}" 
+               class="btn btn-sm {% if status_filter == 'blocked' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Заблокированные
+            </a>
+            <a href="{{ url_for('admin.users_list', status='admin') }}" 
+               class="btn btn-sm {% if status_filter == 'admin' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Администраторы
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Статус</th>
+                        <th>Ключей</th>
+                        <th>Регистрация</th>
+                        <th>Последний вход</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users.items %}
+                    <tr class="{% if user.is_blocked %}row-blocked{% elif not user.is_approved %}row-pending{% endif %}">
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.user_manage', user_id=user.id) }}">
+                                {{ user.email }}
+                            </a>
+                            {% if user.is_admin %}
+                                <span class="badge badge-admin">Admin</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_blocked %}
+                                <span class="badge badge-danger">Заблокирован</span>
+                            {% elif not user.is_approved %}
+                                <span class="badge badge-warning">Ожидает</span>
+                            {% else %}
+                                <span class="badge badge-success">Активен</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ user.keys.count() }}
+                        </td>
+                        <td>
+                            {{ user.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </td>
+                        <td>
+                            {% if user.last_login %}
+                                {{ user.last_login.strftime('%d.%m.%Y %H:%M') }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('admin.user_manage', user_id=user.id) }}" 
+                                   class="btn btn-sm btn-secondary" title="Редактировать">
+                                    ✏️
+                                </a>
+                                
+                                {% if not user.is_approved and not user.is_blocked %}
+                                <form action="{{ url_for('admin.user_approve', user_id=user.id) }}" 
+                                      method="POST" class="inline-form">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Подтвердить">
+                                        ✓
+                                    </button>
+                                </form>
+                                {% endif %}
+                                
+                                {% if user.id != current_user.id %}
+                                    {% if user.is_blocked %}
+                                    <form action="{{ url_for('admin.user_unblock', user_id=user.id) }}" 
+                                          method="POST" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-warning" title="Разблокировать">
+                                            🔓
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form action="{{ url_for('admin.user_block', user_id=user.id) }}" 
+                                          method="POST" class="inline-form">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Заблокировать">
+                                            🔒
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            Пользователи не найдены
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Пагинация -->
+        {% if users.pages > 1 %}
+        <nav class="pagination-nav">
+            <ul class="pagination">
+                {% if users.has_prev %}
+                <li>
+                    <a href="{{ url_for('admin.users_list', page=users.prev_num, status=status_filter) }}" 
+                       class="page-link">← Назад</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in users.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        <li class="{% if page_num == users.page %}active{% endif %}">
+                            <a href="{{ url_for('admin.users_list', page=page_num, status=status_filter) }}" 
+                               class="page-link">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if users.has_next %}
+                <li>
+                    <a href="{{ url_for('admin.users_list', page=users.next_num, status=status_filter) }}" 
+                       class="page-link">Вперёд →</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
