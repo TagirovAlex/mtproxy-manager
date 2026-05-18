@@ -13,7 +13,6 @@ MANAGER_SERVICE="mtproxy-manager"
 MANAGER_BIND_HOST="${MANAGER_BIND_HOST:-127.0.0.1}"
 MANAGER_BIND_PORT="${MANAGER_BIND_PORT:-5000}"
 GUNICORN_WORKERS="${GUNICORN_WORKERS:-2}"
-
 TMP_DIR=""
 
 cleanup() {
@@ -22,6 +21,18 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+ask_yes_no() {
+  local prompt="$1" default="${2:-y}" ans
+  if [[ "$default" == "y" ]]; then
+    prompt="$prompt [Y/n] "
+  else
+    prompt="$prompt [y/N] "
+  fi
+  read -r -p "$prompt" ans
+  ans="${ans:-$default}"
+  [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]]
+}
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Run as root: sudo bash install.sh"
@@ -73,6 +84,97 @@ install_mtg_secure() {
   tar -xzf "${TMP_DIR}/${file_name}" -C "${TMP_DIR}"
   install -m 0755 "$(find "${TMP_DIR}" -type f -name mtg | head -n1)" /usr/local/bin/mtg
 }
+
+install_nginx_config() {
+  echo ""
+  echo "--- Nginx reverse proxy setup ---"
+
+  if ! command -v nginx &>/dev/null; then
+    if ask_yes_no "Nginx is not installed. Install nginx?" "y"; then
+      apt-get install -y nginx
+    else
+      echo "Skipping nginx installation."
+      return
+    fi
+  fi
+
+  local server_domain="${SERVER_DOMAIN:-}"
+  if [[ -z "$server_domain" && -f "${APP_DIR}/.env" ]]; then
+    server_domain="$(grep -oP '^SERVER_DOMAIN\s*=\s*\K.*' "${APP_DIR}/.env" | head -n1 | tr -d '[:space:]"' | tr -d "'")"
+  fi
+
+  if [[ -z "$server_domain" ]]; then
+    echo "SERVER_DOMAIN not set in .env — using _ (catch-all)."
+    echo "Set SERVER_DOMAIN in ${APP_DIR}/.env later and re-run this section."
+    server_domain="_"
+  fi
+
+  cat > "$NGINX_AVAILABLE" <<NGINX
+# MTProxy Manager — reverse proxy config
+# Install with: sudo ln -sf $NGINX_AVAILABLE $NGINX_ENABLED
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${server_domain};
+
+    # ---- Panel ----
+    location / {
+        proxy_pass http://127.0.0.1:${MANAGER_BIND_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    # ---- Static files (direct) ----
+    location /static/ {
+        alias ${APP_DIR}/app/static/;
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ---- Security headers ----
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    client_max_body_size 10m;
+}
+NGINX
+
+  ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+
+  echo "Nginx config written: $NGINX_AVAILABLE"
+
+  # Certbot hint
+  if command -v certbot &>/dev/null; then
+      if ask_yes_no "Set up HTTPS via certbot (Let.s Encrypt)?" "n"; then
+        certbot --nginx -d "$server_domain" --non-interactive --agree-tos --redirect || {
+          echo "certbot failed — run manually later:"
+          echo "  sudo certbot --nginx -d $server_domain"
+        }
+    fi
+  else
+    echo ""
+    echo "HTTPS not configured. To enable later:"
+    echo "  sudo apt-get install -y certbot python3-certbot-nginx"
+    echo "  sudo certbot --nginx -d $server_domain"
+  fi
+
+  nginx -t && systemctl reload nginx && echo "Nginx reloaded."
+}
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo "║         MTProxy Manager — Installer             ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
 
 echo "[1/8] Installing packages"
 apt-get update -y
@@ -159,5 +261,20 @@ chmod 640 "${APP_DIR}/.env" || true
 systemctl daemon-reload
 systemctl enable --now "${MANAGER_SERVICE}"
 
-echo "Install complete."
-echo "Next: run init script (init_app.sh)"
+# ---- Optional Nginx ----
+echo ""
+echo "--- Optional: Nginx reverse proxy ---"
+if ask_yes_no "Install and configure Nginx reverse proxy for the panel?" "y"; then
+  install_nginx_config
+fi
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo "║         Install complete!                        ║"
+echo "║                                                  ║"
+echo "║  Next steps:                                     ║"
+echo "║  sudo bash init_app.sh                           ║"
+echo "║                                                  ║"
+echo "║  Panel:  http://${MANAGER_BIND_HOST}:${MANAGER_BIND_PORT}         ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
