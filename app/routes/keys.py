@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 from app import db, limiter
+from app.helpers import mb_to_bytes
 from app.models import ProxyInstance, Settings
 from app.forms import CreateKeyForm, EditKeyForm
 from app.services.mtg_service import get_mtg_service
@@ -12,12 +13,6 @@ keys_bp = Blueprint("keys", __name__)
 
 def _can_access(instance: ProxyInstance) -> bool:
     return current_user.is_admin or (instance.owner_user_id == current_user.id)
-
-
-def _mb_to_bytes(mb_value):
-    if mb_value is None:
-        return None
-    return int(mb_value) * 1024 * 1024
 
 
 @keys_bp.route("/")
@@ -31,6 +26,8 @@ def list_keys():
         query = query.filter_by(owner_user_id=current_user.id)
 
     status_filter = request.args.get("status", "all")
+    if status_filter not in ("all", "active", "blocked", "inactive"):
+        status_filter = "all"
     if status_filter == "active":
         query = query.filter_by(is_enabled=True, is_blocked=False)
     elif status_filter == "blocked":
@@ -87,7 +84,7 @@ def create_key():
             inst.traffic_limit_period = "none"
         else:
             inst.traffic_limit_period = period
-            inst.traffic_limit_bytes = _mb_to_bytes(form.traffic_limit_mb.data)
+            inst.traffic_limit_bytes = mb_to_bytes(form.traffic_limit_mb.data)
             inst.period_started_at = None
             inst.period_baseline_bytes = 0
             inst.period_used_bytes = 0
@@ -184,7 +181,7 @@ def key_edit(key_id):
             instance.limit_exceeded_at = None
         else:
             instance.traffic_limit_period = period
-            instance.traffic_limit_bytes = _mb_to_bytes(form.traffic_limit_mb.data)
+            instance.traffic_limit_bytes = mb_to_bytes(form.traffic_limit_mb.data)
 
             # При смене лимита/периода — старт нового периода
             instance.period_started_at = None

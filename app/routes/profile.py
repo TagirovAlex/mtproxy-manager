@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 from app import db
+from app.helpers import format_bytes
 from app.models import User, ProxyKey, LoginAttempt
 from app.forms import ProfileForm
 
@@ -103,14 +104,3 @@ def sessions():
     return render_template('admin/profiles/sessions.html', attempts=attempts)
 
 
-def format_bytes(bytes_count):
-    """Форматирование байтов"""
-    if bytes_count is None or bytes_count == 0:
-        return '0 Б'
-    
-    for unit in ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ']:
-        if bytes_count < 1024:
-            return f"{bytes_count:.2f} {unit}"
-        bytes_count /= 1024
-    
-    return f"{bytes_count:.2f} ПБ"

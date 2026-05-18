@@ -156,6 +156,8 @@ def users_list():
     per_page = 20
 
     status_filter = request.args.get("status", "all")
+    if status_filter not in ("all", "pending", "approved", "blocked", "admin"):
+        status_filter = "all"
     query = User.query
 
     if status_filter == "pending":

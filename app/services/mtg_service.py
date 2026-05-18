@@ -256,7 +256,45 @@ class MTGService:
 
 def check_traffic_limits(app):
     with app.app_context():
-        return
+        from app import db
+        from app.models import ProxyInstance
+        from app.services.mtg_service import get_mtg_service
+
+        now = datetime.utcnow()
+        mtg = get_mtg_service()
+
+        # Re-enable instances whose limit period has expired
+        paused = ProxyInstance.query.filter(
+            ProxyInstance.paused_by_limit == True,
+            ProxyInstance.is_blocked == False,
+        ).all()
+        for inst in paused:
+            if inst.traffic_limit_bytes and inst.traffic_limit_period != "none":
+                sec = inst._period_seconds()
+                if sec and inst.limit_exceeded_at:
+                    elapsed = (now - inst.limit_exceeded_at).total_seconds()
+                    if elapsed >= sec:
+                        ok, _ = mtg.start_instance(inst.id)
+                        if ok:
+                            inst.paused_by_limit = False
+                            inst.limit_exceeded_at = None
+
+        # Safety net: stop instances that exceed limit but weren't caught
+        active = ProxyInstance.query.filter(
+            ProxyInstance.is_enabled == True,
+            ProxyInstance.is_blocked == False,
+            ProxyInstance.paused_by_limit == False,
+            ProxyInstance.traffic_limit_bytes.isnot(None),
+            ProxyInstance.traffic_limit_period != "none",
+        ).all()
+        for inst in active:
+            if inst.is_limit_exceeded():
+                ok, _ = mtg.stop_instance(inst.id)
+                if ok:
+                    inst.paused_by_limit = True
+                    inst.limit_exceeded_at = now
+
+        db.session.commit()
 
 
 def get_mtg_service() -> MTGService:

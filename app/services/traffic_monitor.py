@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 import requests
 
 from app import db
+from app.helpers import format_bytes as _format_bytes
 from app.models import ProxyInstance
 
 
@@ -20,17 +21,6 @@ class TrafficMonitor:
 
     def init_app(self, app):
         self.app = app
-
-    @staticmethod
-    def _format_bytes(bytes_count: int) -> str:
-        if bytes_count is None:
-            return "—"
-        value = float(bytes_count)
-        for unit in ["Б", "КБ", "МБ", "ГБ", "ТБ"]:
-            if value < 1024:
-                return f"{value:.2f} {unit}"
-            value /= 1024
-        return f"{value:.2f} ПБ"
 
     @staticmethod
     def _parse_metric_with_labels(raw_name: str):
@@ -109,9 +99,9 @@ class TrafficMonitor:
             "bytes_out": metrics["bytes_out"],
             "total_bytes": total,
             "connections": metrics["connections"],
-            "formatted_in": self._format_bytes(metrics["bytes_in"]),
-            "formatted_out": self._format_bytes(metrics["bytes_out"]),
-            "formatted_total": self._format_bytes(total),
+            "formatted_in": _format_bytes(metrics["bytes_in"]),
+            "formatted_out": _format_bytes(metrics["bytes_out"]),
+            "formatted_total": _format_bytes(total),
         }
 
     def get_all_keys_stats(self, period: str = "day") -> List[Dict]:
@@ -146,9 +136,9 @@ class TrafficMonitor:
             "total_keys": len(items),
             "active_keys": active,
             "total_traffic": total_traffic,
-            "total_traffic_formatted": self._format_bytes(total_traffic),
+            "total_traffic_formatted": _format_bytes(total_traffic),
             "current_period_traffic": total_traffic,
-            "current_period_formatted": self._format_bytes(total_traffic),
+            "current_period_formatted": _format_bytes(total_traffic),
             "connections": total_connections,
             "last_activity": datetime.utcnow().isoformat(),
         }
