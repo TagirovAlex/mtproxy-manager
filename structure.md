@@ -77,7 +77,7 @@ mtproxy-manager/
 ├── config.py                     # Config classes with env-based overrides
 ├── requirements.txt              # Python dependencies
 ├── install.sh                    # Full Debian installation script
-├── mtg_install.sh                # MTG runtime-only installer
+
 ├── init_app.sh                   # DB schema + admin user init
 ├── create_admin.py               # CLI admin management tool
 ├── .env.example                  # Environment variables template

@@ -215,7 +215,8 @@ echo "[6/8] MTG"
 install_mtg_secure
 
 echo "[7/8] systemd units"
-install -m 0644 "${APP_DIR}/app/deploy/systemd/mtg@.service" /etc/systemd/system/mtg@.service
+sed "s|__APP_DIR__|${APP_DIR}|g" "${APP_DIR}/app/deploy/systemd/mtg@.service" > "/etc/systemd/system/mtg@.service"
+chmod 0644 /etc/systemd/system/mtg@.service
 
 cat >"/etc/systemd/system/${MANAGER_SERVICE}.service" <<EOF
 [Unit]

@@ -292,7 +292,7 @@ mtproxy-manager/
 ├── config.py                # Конфигурация
 ├── requirements.txt         # Python-зависимости
 ├── install.sh               # Установщик
-├── mtg_install.sh           # Установка MTG
+
 ├── init_app.sh              # Инициализация БД
 ├── create_admin.py          # CLI управление админами
 ├── .env.example             # Пример конфига
