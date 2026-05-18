@@ -3,6 +3,7 @@
 """
 
 from datetime import datetime
+from urllib.parse import urlparse
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
@@ -125,8 +126,10 @@ def login():
         
         # Перенаправление на запрошенную страницу или на главную
         next_page = request.args.get('next')
-        if next_page and next_page.startswith('/'):
-            return redirect(next_page)
+        if next_page:
+            parsed = urlparse(next_page)
+            if not parsed.netloc and not next_page.startswith('//'):
+                return redirect(next_page)
         
         if user.is_admin:
             return redirect(url_for('admin.dashboard'))
