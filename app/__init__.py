@@ -30,6 +30,13 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    if not app.config.get("SECRET_KEY"):
+        app.logger.warning(
+            "SECRET_KEY not set in environment. "
+            "Using development fallback. "
+            "Set SECRET_KEY in .env for persistent sessions."
+        )
+
     # Создание необходимых директорий
     for path in [
         app.config["DATA_PATH"],

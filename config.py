@@ -29,7 +29,7 @@ def _env_list(name: str, default: list[str]) -> list[str]:
 
 
 class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(32).hex()
+    SECRET_KEY = os.environ.get("SECRET_KEY")
 
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or f"sqlite:///{os.path.join(BASE_DIR, 'data', 'mtproxy.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -71,10 +71,12 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SESSION_COOKIE_SECURE = False
     SYSTEMCTL_USE_SUDO = _env_bool("SYSTEMCTL_USE_SUDO", False)
+    SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(32).hex()
 
 
 class ProductionConfig(Config):
     DEBUG = False
+    SESSION_COOKIE_SECURE = True
 
 
 config = {
