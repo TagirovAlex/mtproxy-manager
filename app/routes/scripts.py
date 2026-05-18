@@ -15,6 +15,7 @@ from datetime import datetime
 from functools import wraps
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from app import limiter
 from flask_login import current_user, login_required
 
 from app.forms import ScriptRunForm
@@ -177,6 +178,7 @@ def view(script_name):
 @scripts_bp.route("/run", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("10 per minute")
 def run():
     form = ScriptRunForm()
     if not form.validate_on_submit():

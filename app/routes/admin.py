@@ -7,7 +7,7 @@ from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 
-from app import db
+from app import db, limiter
 from app.models import User, ProxyInstance, Settings, LoginAttempt
 from app.forms import SettingsForm, UserManageForm
 from app.services.mtg_service import get_mtg_service
@@ -92,33 +92,34 @@ def dashboard():
 @admin_bp.route("/mtg/start", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def mtg_start():
     success, message = get_mtg_service().start()
     flash(message, "success" if success else "danger")
     return redirect(url_for("admin.dashboard"))
 
-
 @admin_bp.route("/mtg/stop", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def mtg_stop():
     success, message = get_mtg_service().stop()
     flash(message, "success" if success else "danger")
     return redirect(url_for("admin.dashboard"))
 
-
 @admin_bp.route("/mtg/restart", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def mtg_restart():
     success, message = get_mtg_service().restart()
     flash(message, "success" if success else "danger")
     return redirect(url_for("admin.dashboard"))
 
-
 @admin_bp.route("/mtg/reload", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def mtg_reload():
     success, message = get_mtg_service().reload_config()
     flash("Конфигурация перезагружена" if success else message, "success" if success else "danger")
@@ -128,6 +129,7 @@ def mtg_reload():
 @admin_bp.route("/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def settings():
     form = SettingsForm()
 
@@ -215,6 +217,7 @@ def user_manage(user_id):
 @admin_bp.route("/users/<int:user_id>/approve", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def user_approve(user_id):
     user = User.query.get_or_404(user_id)
     user.is_approved = True
@@ -222,10 +225,10 @@ def user_approve(user_id):
     flash(f"Пользователь {user.email} подтверждён", "success")
     return redirect(url_for("admin.users_list"))
 
-
 @admin_bp.route("/users/<int:user_id>/block", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def user_block(user_id):
     user = User.query.get_or_404(user_id)
     if user.id == current_user.id:
@@ -237,10 +240,10 @@ def user_block(user_id):
     flash(f"Пользователь {user.email} заблокирован", "success")
     return redirect(url_for("admin.users_list"))
 
-
 @admin_bp.route("/users/<int:user_id>/unblock", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def user_unblock(user_id):
     user = User.query.get_or_404(user_id)
     user.is_blocked = False
@@ -250,10 +253,10 @@ def user_unblock(user_id):
     flash(f"Пользователь {user.email} разблокирован", "success")
     return redirect(url_for("admin.users_list"))
 
-
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @login_required
 @admin_required
+@limiter.limit("20 per minute")
 def user_delete(user_id):
     user = User.query.get_or_404(user_id)
 

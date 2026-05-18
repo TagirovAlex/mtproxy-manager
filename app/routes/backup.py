@@ -7,6 +7,7 @@ from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, current_app
 from flask_login import login_required, current_user
 
+from app import limiter
 from app.forms import BackupForm
 from app.services.backup_service import BackupService, get_backup_service
 
@@ -49,6 +50,7 @@ def index():
 @backup_bp.route('/create', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("10 per minute")
 def create():
     """Создание резервной копии"""
     form = BackupForm()
@@ -94,6 +96,7 @@ def download(backup_id):
 @backup_bp.route('/<int:backup_id>/restore', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("10 per minute")
 def restore(backup_id):
     """Восстановление из резервной копии"""
     backup_service = get_backup_service()
@@ -111,6 +114,7 @@ def restore(backup_id):
 @backup_bp.route('/<int:backup_id>/delete', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("10 per minute")
 def delete(backup_id):
     """Удаление резервной копии"""
     backup_service = get_backup_service()
@@ -144,6 +148,7 @@ def info(backup_id):
 @backup_bp.route('/settings', methods=['POST'])
 @login_required
 @admin_required
+@limiter.limit("10 per minute")
 def update_settings():
     """Обновление настроек автобэкапа"""
     enabled = request.form.get('auto_backup_enabled') == 'on'

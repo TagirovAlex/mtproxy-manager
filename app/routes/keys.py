@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
-from app import db
+from app import db, limiter
 from app.models import ProxyInstance, Settings
 from app.forms import CreateKeyForm, EditKeyForm
 from app.services.mtg_service import get_mtg_service
@@ -53,6 +53,7 @@ def list_keys():
 
 @keys_bp.route("/create", methods=["GET", "POST"])
 @login_required
+@limiter.limit("30 per minute")
 def create_key():
     form = CreateKeyForm()
 
@@ -144,6 +145,7 @@ def key_detail(key_id):
 
 @keys_bp.route("/<key_id>/edit", methods=["GET", "POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_edit(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -202,6 +204,7 @@ def key_edit(key_id):
 
 @keys_bp.route("/<key_id>/regenerate", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_regenerate(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -215,6 +218,7 @@ def key_regenerate(key_id):
 
 @keys_bp.route("/<key_id>/start", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_start(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -228,6 +232,7 @@ def key_start(key_id):
 
 @keys_bp.route("/<key_id>/stop", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_stop(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -241,6 +246,7 @@ def key_stop(key_id):
 
 @keys_bp.route("/<key_id>/restart", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_restart(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -254,6 +260,7 @@ def key_restart(key_id):
 
 @keys_bp.route("/<key_id>/toggle", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_toggle(key_id):
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
@@ -274,6 +281,7 @@ def key_toggle(key_id):
 
 @keys_bp.route("/<key_id>/block", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_block(key_id):
     if not current_user.is_admin:
         flash("Только для администратора", "danger")
@@ -290,6 +298,7 @@ def key_block(key_id):
 
 @keys_bp.route("/<key_id>/unblock", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_unblock(key_id):
     if not current_user.is_admin:
         flash("Только для администратора", "danger")
@@ -305,7 +314,16 @@ def key_unblock(key_id):
 
 @keys_bp.route("/<key_id>/delete", methods=["POST"])
 @login_required
+@limiter.limit("30 per minute")
 def key_delete(key_id):
+    instance = ProxyInstance.query.get_or_404(key_id)
+    if not _can_access(instance):
+        flash("Доступ запрещен", "danger")
+        return redirect(url_for("keys.list_keys"))
+
+    ok, msg = get_mtg_service().delete_instance(instance)
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for("keys.list_keys"))
     instance = ProxyInstance.query.get_or_404(key_id)
     if not _can_access(instance):
         flash("Доступ запрещен", "danger")
