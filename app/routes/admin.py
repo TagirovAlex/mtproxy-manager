@@ -2,12 +2,11 @@
 Маршруты панели администратора.
 """
 
-from functools import wraps
-
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 
 from app import db, limiter
+from app.decorators import admin_required
 from app.models import User, ProxyInstance, Settings, LoginAttempt
 from app.forms import SettingsForm, UserManageForm
 from app.services.mtg_service import get_mtg_service
@@ -15,20 +14,6 @@ from app.services.system_monitor import SystemMonitor
 from app.services.traffic_monitor import TrafficMonitor
 
 admin_bp = Blueprint("admin", __name__)
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            flash("Необходимо войти в систему", "warning")
-            return redirect(url_for("auth.login"))
-        if not current_user.is_admin:
-            flash("Доступ запрещён. Требуются права администратора.", "danger")
-            return redirect(url_for("keys.list_keys"))
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 @admin_bp.route("/dashboard")

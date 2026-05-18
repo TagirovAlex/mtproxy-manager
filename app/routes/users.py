@@ -2,29 +2,14 @@
 Маршруты для работы с пользователями (админ).
 """
 
-from functools import wraps
-
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 
 from app import db
+from app.decorators import admin_required
 from app.models import User, ProxyInstance, LoginAttempt
 
 users_bp = Blueprint("users", __name__)
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            flash("Необходимо войти в систему", "warning")
-            return redirect(url_for("auth.login"))
-        if not current_user.is_admin:
-            flash("Доступ запрещён", "danger")
-            return redirect(url_for("keys.list_keys"))
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 @users_bp.route("/")

@@ -3,30 +3,15 @@
 """
 
 import os
-from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, current_app
 from flask_login import login_required, current_user
 
 from app import limiter
+from app.decorators import admin_required
 from app.forms import BackupForm
 from app.services.backup_service import BackupService, get_backup_service
 
 backup_bp = Blueprint('backup', __name__)
-
-
-def admin_required(f):
-    """Декоратор для проверки прав администратора"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            flash('Необходимо войти в систему', 'warning')
-            return redirect(url_for('auth.login'))
-        if not current_user.is_admin:
-            flash('Доступ запрещён', 'danger')
-            return redirect(url_for('keys.list_keys'))
-        return f(*args, **kwargs)
-    return decorated_function
-
 
 @backup_bp.route('/')
 @login_required

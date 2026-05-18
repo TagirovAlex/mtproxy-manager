@@ -12,29 +12,15 @@ import os
 import shlex
 import subprocess
 from datetime import datetime
-from functools import wraps
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from app import limiter
+from app.decorators import admin_required
 from flask_login import current_user, login_required
 
 from app.forms import ScriptRunForm
 
 scripts_bp = Blueprint("scripts", __name__)
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
-            flash("Необходимо войти в систему", "warning")
-            return redirect(url_for("auth.login"))
-        if not current_user.is_admin:
-            flash("Доступ запрещён", "danger")
-            return redirect(url_for("keys.list_keys"))
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 def _scripts_dir() -> str:
