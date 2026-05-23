@@ -86,6 +86,9 @@ install_mtg_secure() {
 }
 
 install_nginx_config() {
+  local NGINX_AVAILABLE="/etc/nginx/sites-available/mtproxy-manager"
+  local NGINX_ENABLED="/etc/nginx/sites-enabled/mtproxy-manager"
+
   echo ""
   echo "--- Nginx reverse proxy setup ---"
 

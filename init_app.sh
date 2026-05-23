@@ -11,8 +11,18 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMeStrong123!}"
 cd "${APP_DIR}"
 source "${VENV_DIR}/bin/activate"
 
-echo "[1/4] Ensure SQLite schema (limit columns)"
-sqlite3 "${DB_PATH}" <<'SQL'
+echo "[1/4] Database schema init"
+cd "${APP_DIR}"
+python - <<PY
+from app import create_app, db
+app = create_app("production")
+with app.app_context():
+    db.create_all()
+    print("Database schema created/verified.")
+PY
+
+echo "[2/4] Ensure SQLite schema (limit columns)"
+sqlite3 "${DB_PATH}" <<'SQL' 2>/dev/null || true
 ALTER TABLE proxy_instances ADD COLUMN traffic_limit_bytes BIGINT;
 ALTER TABLE proxy_instances ADD COLUMN traffic_limit_period VARCHAR(10) DEFAULT 'none';
 ALTER TABLE proxy_instances ADD COLUMN period_started_at DATETIME;
@@ -22,10 +32,10 @@ ALTER TABLE proxy_instances ADD COLUMN paused_by_limit BOOLEAN DEFAULT 0;
 ALTER TABLE proxy_instances ADD COLUMN limit_exceeded_at DATETIME;
 SQL
 
-echo "[2/4] Validate columns"
+echo "[3/4] Validate columns"
 sqlite3 "${DB_PATH}" "PRAGMA table_info(proxy_instances);" | grep -E "traffic_limit|period_|paused_by_limit|limit_exceeded_at" || true
 
-echo "[3/4] Create/update admin user"
+echo "[4/4] Create/update admin user"
 python - <<PY
 from app import create_app, db
 from app.models import User
@@ -45,7 +55,7 @@ with app.app_context():
     print("admin ready:", u.email)
 PY
 
-echo "[4/4] Restart service"
+echo "[5/4] Restart service"
 systemctl restart mtproxy-manager
 systemctl status mtproxy-manager --no-pager | sed -n '1,20p'
 
