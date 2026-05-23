@@ -153,21 +153,29 @@ NGINX
 
   ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
 
+  # Remove default nginx site to avoid conflict on port 80
+  if [[ -f "/etc/nginx/sites-enabled/default" ]]; then
+    rm -f "/etc/nginx/sites-enabled/default"
+    echo "Removed default nginx site (conflicts on port 80)."
+  fi
+
   echo "Nginx config written: $NGINX_AVAILABLE"
 
-  # Certbot hint
-  if command -v certbot &>/dev/null; then
-      if ask_yes_no "Set up HTTPS via certbot (Let.s Encrypt)?" "n"; then
-        certbot --nginx -d "$server_domain" --non-interactive --agree-tos --redirect || {
-          echo "certbot failed — run manually later:"
-          echo "  sudo certbot --nginx -d $server_domain"
-        }
+  # Certbot hint (skip when domain is catch-all)
+  if [[ "$server_domain" != "_" ]]; then
+    if command -v certbot &>/dev/null; then
+        if ask_yes_no "Set up HTTPS via certbot (Let.s Encrypt)?" "n"; then
+          certbot --nginx -d "$server_domain" --non-interactive --agree-tos --redirect || {
+            echo "certbot failed — run manually later:"
+            echo "  sudo certbot --nginx -d $server_domain"
+          }
+      fi
+    else
+      echo ""
+      echo "HTTPS not configured. To enable later:"
+      echo "  sudo apt-get install -y certbot python3-certbot-nginx"
+      echo "  sudo certbot --nginx -d $server_domain"
     fi
-  else
-    echo ""
-    echo "HTTPS not configured. To enable later:"
-    echo "  sudo apt-get install -y certbot python3-certbot-nginx"
-    echo "  sudo certbot --nginx -d $server_domain"
   fi
 
   nginx -t && systemctl reload nginx && echo "Nginx reloaded."
