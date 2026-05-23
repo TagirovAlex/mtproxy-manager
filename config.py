@@ -37,7 +37,7 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", False)
 
     BASE_DIR = BASE_DIR
     DATA_PATH = os.path.join(BASE_DIR, "data")
@@ -76,7 +76,6 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    SESSION_COOKIE_SECURE = True
 
 
 config = {
