@@ -63,6 +63,8 @@ def create_key():
 
     if form.validate_on_submit():
         owner = form.owner_user_id.data if current_user.is_admin else current_user.id
+        role = form.role.data
+        backend_tunnel_ip = form.backend_tunnel_ip.data.strip() if form.backend_tunnel_ip.data else None
         mtg = get_mtg_service()
         ok, msg, inst = mtg.create_instance(
             name=form.name.data,
@@ -71,6 +73,8 @@ def create_key():
             fake_tls_domain=form.fake_tls_domain.data,
             owner_user_id=owner,
             notes=form.notes.data,
+            role=role,
+            backend_tunnel_ip=backend_tunnel_ip,
         )
 
         if not ok:
@@ -153,6 +157,8 @@ def key_edit(key_id):
 
     if request.method == "GET":
         form.owner_user_id.data = instance.owner_user_id or 0
+        form.role.data = instance.role
+        form.backend_tunnel_ip.data = instance.backend_tunnel_ip or ""
         form.traffic_limit_period.data = instance.traffic_limit_period or "none"
         form.traffic_limit_mb.data = (
             int(instance.traffic_limit_bytes / (1024 * 1024))
@@ -166,6 +172,8 @@ def key_edit(key_id):
         instance.bind_port = int(form.bind_port.data)
         instance.fake_tls_domain = form.fake_tls_domain.data.strip()
         instance.owner_user_id = form.owner_user_id.data or None
+        instance.role = form.role.data
+        instance.backend_tunnel_ip = form.backend_tunnel_ip.data.strip() if form.backend_tunnel_ip.data else None
         instance.is_enabled = form.is_enabled.data
         instance.is_blocked = form.is_blocked.data
         instance.notes = form.notes.data

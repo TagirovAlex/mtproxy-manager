@@ -99,6 +99,8 @@ class MTGService:
         fake_tls_domain: str,
         owner_user_id: Optional[int] = None,
         notes: Optional[str] = None,
+        role: str = "standalone",
+        backend_tunnel_ip: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[ProxyInstance]]:
         bind_ip = (bind_ip or "0.0.0.0").strip()
         bind_port = int(bind_port)
@@ -118,6 +120,8 @@ class MTGService:
             name=(name or "").strip(),
             secret=secret,
             fake_tls_domain=domain,
+            role=role,
+            backend_tunnel_ip=backend_tunnel_ip,
             bind_ip=bind_ip,
             bind_port=bind_port,
             stats_port=stats_port,

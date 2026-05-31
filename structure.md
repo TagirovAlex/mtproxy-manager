@@ -1,7 +1,7 @@
 mtproxy-manager/
 ├── app/
 │   ├── __init__.py               # Flask app factory, extensions, scheduler, error handlers
-│   ├── models.py                 # SQLAlchemy models: User, ProxyKey, ProxyInstance, TrafficLog, LoginAttempt, Settings, BackupRecord
+│   ├── models.py                 # SQLAlchemy models: User, ProxyKey, ProxyInstance (role, backend_tunnel_ip), TrafficLog, LoginAttempt, Settings, BackupRecord
 │   ├── forms.py                  # WTForms: Login, Registration, Profile, CreateKey, EditKey, UserManage, Settings, Backup, ScriptRun, ConfirmAction
 │   ├── routes/
 │   │   ├── __init__.py           # Blueprint imports
@@ -62,7 +62,8 @@ mtproxy-manager/
 │   ├── migrations/
 │   │   └── versions/
 │   │       ├── 20261001_add_proxy_instances.py
-│   │       └── 20261002_add_proxy_instance_limits.py
+│   │       ├── 20261002_add_proxy_instance_limits.py
+│   │       └── 20261003_add_proxy_instance_roles.py
 │   └── deploy/
 │       └── systemd/
 │           └── mtg@.service      # systemd template unit for MTG instances
@@ -76,8 +77,8 @@ mtproxy-manager/
 ├── run.py                        # Entry point
 ├── config.py                     # Config classes with env-based overrides
 ├── requirements.txt              # Python dependencies
-├── install.sh                    # Full Debian installation script
-
+├── install.sh                    # Full Debian installation script (Server A - panel + MTG)
+├── install_server_b.sh           # Minimal Debian installation script (Server B - WireGuard + NAT)
 ├── init_app.sh                   # DB schema + admin user init
 ├── create_admin.py               # CLI admin management tool
 ├── .env.example                  # Environment variables template

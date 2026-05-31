@@ -15,6 +15,14 @@ MANAGER_BIND_PORT="${MANAGER_BIND_PORT:-5000}"
 GUNICORN_WORKERS="${GUNICORN_WORKERS:-2}"
 TMP_DIR=""
 
+# Frontend (VPN tunnel) mode — set via env or prompted
+FRONTEND_MODE="${FRONTEND_MODE:-}"
+BACKEND_PUBLIC_IP="${BACKEND_PUBLIC_IP:-}"
+BACKEND_TUNNEL_IP="${BACKEND_TUNNEL_IP:-10.0.0.1}"
+FRONTEND_TUNNEL_IP="${FRONTEND_TUNNEL_IP:-10.0.0.2}"
+WG_INTERFACE="${WG_INTERFACE:-wg0}"
+WG_PORT="${WG_PORT:-51820}"
+
 cleanup() {
   if [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR:-}" ]]; then
     rm -rf "${TMP_DIR}"
@@ -272,6 +280,67 @@ chmod 640 "${APP_DIR}/.env" || true
 
 systemctl daemon-reload
 systemctl enable --now "${MANAGER_SERVICE}"
+
+# ---- Optional WireGuard (Frontend mode) ----
+echo ""
+echo "--- Optional: WireGuard tunnel to backend server ---"
+if [[ -z "${FRONTEND_MODE}" ]]; then
+  if ask_yes_no "Configure this server as a FRONTEND with WireGuard tunnel to a backend server (NAT/gateway)?" "n"; then
+    FRONTEND_MODE="yes"
+  fi
+fi
+
+if [[ "${FRONTEND_MODE}" =~ ^(yes|y|1|true)$ ]]; then
+  apt-get install -y wireguard
+
+  if [[ -z "${BACKEND_PUBLIC_IP}" ]]; then
+    read -r -p "Enter backend server public IP: " BACKEND_PUBLIC_IP
+  fi
+
+  WG_PRIVATE_KEY="${WG_PRIVATE_KEY:-$(wg genkey)}"
+  WG_PUBLIC_KEY="$(echo "${WG_PRIVATE_KEY}" | wg pubkey)"
+
+  cat >"/etc/wireguard/${WG_INTERFACE}.conf" <<WGEOF
+[Interface]
+Address = ${FRONTEND_TUNNEL_IP}/24
+PrivateKey = ${WG_PRIVATE_KEY}
+# Save and restore DNS on connect/resolve
+# DNS = 1.1.1.1
+
+[Peer]
+PublicKey = <set-me: backend public key>
+Endpoint = ${BACKEND_PUBLIC_IP}:${WG_PORT}
+AllowedIPs = ${BACKEND_TUNNEL_IP}/32
+PersistentKeepalive = 25
+WGEOF
+
+  chmod 600 "/etc/wireguard/${WG_INTERFACE}.conf"
+
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════╗"
+  echo "║  WireGuard config created!                              ║"
+  echo "║                                                        ║"
+  echo "║  1. Copy this PUBLIC KEY to backend server:             ║"
+  echo "║     ${WG_PUBLIC_KEY}"
+  echo "║                                                        ║"
+  echo "║  2. Run install_server_b.sh on the backend server,      ║"
+  echo "║     or manually:                                        ║"
+  echo "║     - Set PublicKey in backend's Peer section           ║"
+  echo "║     - Run: systemctl enable --now wg-quick@${WG_INTERFACE}   ║"
+  echo "║                                                        ║"
+  echo "║  3. On this server, set backend public key in:          ║"
+  echo "║     /etc/wireguard/${WG_INTERFACE}.conf (PublicKey = ...)  ║"
+  echo "║     Then run: systemctl enable --now wg-quick@${WG_INTERFACE} ║"
+  echo "║                                                        ║"
+  echo "║  4. Add routes to Telegram via backend:                 ║"
+  echo "║     ip route add <tg-dc-ip> via ${BACKEND_TUNNEL_IP} dev ${WG_INTERFACE}    ║"
+  echo "╚══════════════════════════════════════════════════════════╝"
+  echo ""
+else
+  echo "Skipping WireGuard setup. Install manually later if needed."
+  echo "  See: sudo bash install_server_b.sh (on backend)"
+  echo "  And: install.sh with FRONTEND_MODE=yes (on this server)"
+fi
 
 # ---- Optional Nginx ----
 echo ""

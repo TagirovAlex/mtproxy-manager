@@ -24,6 +24,7 @@
   <thead>
     <tr>
       <th>Имя</th>
+      <th>Роль</th>
       <th>Bind</th>
       <th>FakeTLS</th>
       <th>Владелец</th>
@@ -37,6 +38,13 @@
     <tr>
       <td>
         <a href="{{ url_for('keys.key_detail', key_id=key.id) }}">{{ key.name }}</a>
+      </td>
+      <td>
+        {% if key.is_frontend %}
+          <span class="badge badge-info">Frontend</span>
+        {% else %}
+          <span class="badge badge-secondary">Обычный</span>
+        {% endif %}
       </td>
       <td>{{ key.bind_ip }}:{{ key.bind_port }}</td>
       <td>{{ key.fake_tls_domain }}</td>

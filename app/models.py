@@ -169,6 +169,9 @@ class ProxyInstance(db.Model):
     secret = db.Column(db.String(256), unique=True, nullable=False, index=True)
     fake_tls_domain = db.Column(db.String(255), default="www.google.com", nullable=False)
 
+    role = db.Column(db.String(20), default="standalone", nullable=False)  # standalone / frontend
+    backend_tunnel_ip = db.Column(db.String(64), nullable=True)  # IP туннеля сервера Б (для frontend)
+
     bind_ip = db.Column(db.String(64), default="0.0.0.0", nullable=False)
     bind_port = db.Column(db.Integer, nullable=False)
     stats_port = db.Column(db.Integer, nullable=False)
@@ -202,6 +205,14 @@ class ProxyInstance(db.Model):
     @property
     def unit_name(self):
         return f"mtg@{self.id}.service"
+
+    @property
+    def role_label(self):
+        return {"standalone": "Обычный", "frontend": "Frontend (через ВПН-туннель)"}.get(self.role, self.role)
+
+    @property
+    def is_frontend(self) -> bool:
+        return self.role == "frontend" and bool(self.backend_tunnel_ip)
 
     @property
     def status_label(self):

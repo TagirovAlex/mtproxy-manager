@@ -1,7 +1,11 @@
 # MTProxy Manager - Agent Guidance
 
 ## What This Project Is
-Flask web panel for managing [MTG](https://github.com/9seconds/mtg) (Telegram MTProto proxy) instances on Debian servers. Each instance = 1 secret key = 1 systemd service (`mtg@<instance_id>.service`). Multi-instance architecture with Prometheus-based traffic monitoring, traffic limits, backup/restore, and secure script runner.
+Flask web panel for managing [MTG](https://github.com/9seconds/mtg) (Telegram MTProto proxy) instances on Debian servers. Each instance = 1 secret key = 1 systemd service (`mtg@<instance_id>.service`). Multi-instance architecture with Prometheus-based traffic monitoring, traffic limits, backup/restore, secure script runner.
+
+Supports two deployment modes:
+- **Standalone** — MTG on a single server (default, original behavior)
+- **Frontend/Backend** — MTG on Server A + WireGuard tunnel + Server B as NAT gateway (no MTG on Server B)
 
 ## Running the App
 
@@ -23,11 +27,11 @@ systemctl start mtproxy-manager
 ## Key Directories
 - `app/routes/` — Flask blueprints (auth, admin, keys, users, backup, scripts, profile)
 - `app/services/` — Business logic (mtg_service, traffic_monitor, backup_service, key_generator, system_monitor)
-- `app/models.py` — SQLAlchemy models (User, ProxyInstance, ProxyKey, TrafficLog, LoginAttempt, Settings, BackupRecord)
-- `app/forms.py` — WTForms (LoginForm, RegistrationForm, ProfileForm, CreateKeyForm, EditKeyForm, SettingsForm, BackupForm, ScriptRunForm, etc.)
+- `app/models.py` — SQLAlchemy models (User, ProxyInstance with `role`/`backend_tunnel_ip`, ProxyKey, TrafficLog, LoginAttempt, Settings, BackupRecord)
+- `app/forms.py` — WTForms (LoginForm, RegistrationForm, ProfileForm, CreateKeyForm with `role`/`backend_tunnel_ip`, EditKeyForm, SettingsForm, BackupForm, ScriptRunForm, etc.)
 - `app/templates/` — Jinja2 templates (base.html + admin/ + auth/ subdirectories)
 - `app/static/` — `css/style.css` (custom, ~2100 lines) and `js/main.js` (vanilla JS, ~417 lines)
-- `app/migrations/versions/` — Alembic migrations (2 migrations)
+- `app/migrations/versions/` — Alembic migrations (3 migrations)
 - `app/deploy/systemd/` — systemd template unit for MTG
 - `mtg/instances/<id>.toml` — Per-instance MTG configs (TOML format with Prometheus stats section)
 - `data/` — SQLite database
@@ -36,6 +40,8 @@ systemctl start mtproxy-manager
 - `scripts/` — User-defined scripts for script runner
 
 ## Required Setup (Debian)
+
+**Server A (panel + MTG):**
 ```bash
 # Full install (requires root)
 sudo MTG_SHA256=<sha256> bash install.sh
@@ -49,6 +55,11 @@ cd /opt/mtproxy-manager && source .venv/bin/activate && python create_admin.py -
 
 # Check service
 sudo systemctl status mtproxy-manager
+```
+
+**Server B (backend gateway — optional, for frontend mode):**
+```bash
+sudo bash install_server_b.sh
 ```
 
 ## Key Environment Variables
@@ -68,11 +79,18 @@ See `.env.example` for full list:
 - `MAX_KEYS_PER_USER` — Max instances per user (default: 5)
 - `SERVER_DOMAIN` — Domain for proxy links
 - `MTG_SHA256` — SHA256 checksum for MTG binary verification
+- `FRONTEND_MODE` — Set to `yes` to enable WireGuard tunnel setup during `install.sh`
+- `BACKEND_PUBLIC_IP` — Server B public IP (for WireGuard config)
+- `BACKEND_TUNNEL_IP` — Server B IP inside the WireGuard tunnel (default: `10.0.0.1`)
+- `FRONTEND_TUNNEL_IP` — Server A IP inside the WireGuard tunnel (default: `10.0.0.2`)
+- `WG_INTERFACE` — WireGuard interface name (default: `wg0`)
+- `WG_PORT` — WireGuard listening port (default: `51820`)
 
 ## Database Migrations
 Uses Flask-Migrate (`flask db` commands). Existing migrations in `app/migrations/versions/`:
 1. `20261001_add_proxy_instances.py` — creates proxy_instances table, migrates active proxy_keys
 2. `20261002_add_proxy_instance_limits.py` — adds traffic limit columns to proxy_instances
+3. `20261003_add_proxy_instance_roles.py` — adds `role` (standalone/frontend) and `backend_tunnel_ip` columns
 
 After code updates:
 ```bash
@@ -96,12 +114,14 @@ flask db upgrade
 - **Two model systems coexist**: `ProxyInstance` (new multi-instance) and `ProxyKey` (legacy single-key model). New development should use `ProxyInstance`.
 - Password hashing uses Werkzeug `scrypt` method
 - CLI tool `create_admin.py` for admin management outside web UI
+- **Frontend/Backend mode**: `ProxyInstance.role` = `standalone` (default, original) or `frontend`. For frontend instances, `backend_tunnel_ip` stores the Server B WireGuard tunnel IP. MTG config is identical — routing happens at OS level via WireGuard.
 
 ## Update Procedure
 ```bash
 git pull --ff-only
 source .venv/bin/activate
 pip install -r requirements.txt
+flask db upgrade
 sudo systemctl restart mtproxy-manager
 ```
 
@@ -109,7 +129,9 @@ sudo systemctl restart mtproxy-manager
 - **App factory**: `app/__init__.py` creates Flask app, initializes extensions, registers blueprints, sets up scheduler
 - **Config**: `config.py` has `Config`, `DevelopmentConfig`, `ProductionConfig` classes with env-based overrides
 - **Dual-key models**: `ProxyKey` (legacy, for `TrafficLog` FK) and `ProxyInstance` (active development for multi-instance)
-- **MTG config format**: TOML with `secret`, `bind-to`, and `[stats.prometheus]` section
+- **ProxyInstance roles**: `standalone` (default, original) — normal MTG; `frontend` — MTG on Server A with traffic routed through WireGuard tunnel to Server B (NAT gateway)
+- **MTG config format**: TOML with `secret`, `bind-to`, and `[stats.prometheus]` section (same for both roles — routing is OS-level)
 - **Traffic monitoring**: scrapes `http://127.0.0.1:<stats_port>/metrics` Prometheus endpoint of each MTG instance
 - **Script runner**: only admin, only allowlist, basename-only (no user paths), audit log, timeout
 - **Backup**: tar.gz containing `data/mtproxy.db`, `mtg/mtg.toml`, `scripts/` with safe-extract path traversal protection
+- **Install scripts**: `install.sh` for Server A (panel + MTG + optional WireGuard), `install_server_b.sh` for Server B (WireGuard + NAT only)

@@ -68,6 +68,17 @@ class CreateKeyForm(FlaskForm):
     fake_tls_domain = StringField("Домен FakeTLS", validators=[DataRequired(), Length(min=3, max=255)])
     owner_user_id = SelectField("Пользователь", coerce=int, validators=[Optional()])
 
+    role = SelectField(
+        "Роль",
+        choices=[("standalone", "Обычный"), ("frontend", "Frontend (через ВПН-туннель)")],
+        default="standalone",
+    )
+    backend_tunnel_ip = StringField(
+        "IP сервера Б в туннеле",
+        validators=[Optional(), Length(min=0, max=64)],
+        description="Только для frontend: IP адрес сервера Б в WireGuard туннеле (например, 10.0.0.1)",
+    )
+
     traffic_limit_period = SelectField(
         "Период лимита",
         choices=[
@@ -107,6 +118,16 @@ class EditKeyForm(FlaskForm):
     owner_user_id = SelectField("Пользователь", coerce=int, validators=[Optional()])
     is_enabled = BooleanField("Включен")
     is_blocked = BooleanField("Заблокирован")
+
+    role = SelectField(
+        "Роль",
+        choices=[("standalone", "Обычный"), ("frontend", "Frontend (через ВПН-туннель)")],
+        default="standalone",
+    )
+    backend_tunnel_ip = StringField(
+        "IP сервера Б в туннеле",
+        validators=[Optional(), Length(min=0, max=64)],
+    )
 
     traffic_limit_period = SelectField(
         "Период лимита",

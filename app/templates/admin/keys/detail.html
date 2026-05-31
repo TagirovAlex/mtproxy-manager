@@ -29,6 +29,16 @@
   <div class="card-header"><h3>Параметры</h3></div>
   <div class="card-body">
     <p><strong>ID:</strong> {{ key.id }}</p>
+    <p><strong>Роль:</strong> {{ key.role_label }}
+      {% if key.is_frontend %}
+        <span class="badge badge-info">Frontend</span>
+      {% else %}
+        <span class="badge badge-secondary">Обычный</span>
+      {% endif %}
+    </p>
+    {% if key.is_frontend %}
+    <p><strong>Backend (сервер Б) в туннеле:</strong> {{ key.backend_tunnel_ip }}</p>
+    {% endif %}
     <p><strong>Bind:</strong> {{ key.bind_ip }}:{{ key.bind_port }}</p>
     <p><strong>Stats port:</strong> {{ key.stats_port }}</p>
     <p><strong>FakeTLS domain:</strong> {{ key.fake_tls_domain }}</p>
@@ -37,6 +47,46 @@
     <p><strong>PID:</strong> {{ service_status.pid if service_status.pid else "—" }}</p>
   </div>
 </div>
+
+{% if key.is_frontend %}
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>WireGuard туннель</h3></div>
+  <div class="card-body">
+    <p><strong>Сервер А (этот сервер):</strong> MTG отправляет трафик Telegram через туннель на сервер Б.</p>
+    <p><strong>Сервер Б (backend):</strong> {{ key.backend_tunnel_ip }} — NAT/gateway для выхода в Telegram.</p>
+    <hr>
+    <p><strong>Настройка сервера А:</strong></p>
+    <pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:13px;"># /etc/wireguard/wg0.conf
+[Interface]
+Address = 10.0.0.2/24
+PrivateKey = &lt;private-key-a&gt;
+
+[Peer]
+PublicKey = &lt;public-key-b&gt;
+Endpoint = &lt;ip-сервера-Б&gt;:51820
+AllowedIPs = 10.0.0.0/24
+PersistentKeepalive = 25</pre>
+    <p><strong>Маршрутизация через сервер Б:</strong></p>
+    <pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:13px;">ip route add 10.0.0.0/24 dev wg0
+# Маршрут по умолчанию для Telegram трафика (или точечные маршруты до DC Telegram):
+# ip route add &lt;ip-telegram-dc&gt; via 10.0.0.1 dev wg0</pre>
+    <p><strong>Настройка сервера Б:</strong></p>
+    <pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:13px;"># /etc/wireguard/wg0.conf
+[Interface]
+Address = 10.0.0.1/24
+PrivateKey = &lt;private-key-b&gt;
+ListenPort = 51820
+
+[Peer]
+PublicKey = &lt;public-key-a&gt;
+AllowedIPs = 10.0.0.2/32
+
+# Включить форвардинг и NAT:
+# sysctl net.ipv4.ip_forward=1
+# iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE</pre>
+  </div>
+</div>
+{% endif %}
 
 <div class="card" style="margin-top:16px;">
   <div class="card-header"><h3>Трафик (live)</h3></div>

@@ -8,6 +8,7 @@
 - Управление через UI: create / edit / start / stop / restart / delete / block
 - Мониторинг трафика и соединений по каждому инстансу через Prometheus-метрики
 - Лимиты трафика: **без лимита / день / неделя / месяц** с автоостановкой при превышении и автозапуском при сбросе периода
+- Режим **Frontend** — MTG на сервере А, трафик через WireGuard туннель на сервер Б (NAT/gateway)
 - База данных: **только SQLite**
 - Безопасный запуск shell-скриптов с allowlist и аудитом
 
@@ -16,6 +17,7 @@
 - Аутентификация пользователей, роли (admin/user), подтверждение регистрации админом
 - Админ-панель: дашборд со статистикой, управление пользователями, настройки
 - Multi-instance: неограниченное количество proxy-инстансов, каждый со своим портом и secret
+- **Frontend-режим**: инстанс с ролью `frontend` + IP backend сервера в WireGuard туннеле
 - Генерация FakeTLS secret с произвольным валидным доменом (`ee + 16 байт + домен`)
 - Авто-генерация конфигов `mtg/instances/<id>.toml` (формат TOML для MTG)
 - Управление systemd юнитами `mtg@*.service` через sudoers
@@ -44,11 +46,13 @@
 - **CI/Deploy**: Bash install scripts
 - **Администрирование**: CLI-скрипт `create_admin.py`
 - **Frontend**: Jinja2 шаблоны + CSS (кастомный) + Vanilla JS
+- **Туннель (опционально)**: WireGuard
 
 ## Быстрый старт (Debian 12)
 
 ### 1) Установка
 
+**Сервер А (с панелью и MTG):**
 ~~~bash
 sudo MTG_SHA256="<sha256_архива_mtg>" bash install.sh
 ~~~
@@ -62,6 +66,18 @@ sudo MTG_SHA256="<sha256_архива_mtg>" bash install.sh
 6. Установка MTG (авто-определение архитектуры, проверка SHA256)
 7. Установка systemd unit: `mtg@.service` и `mtproxy-manager.service`
 8. Настройка sudoers для управления `mtg@*.service`
+9. **Опционально**: WireGuard туннель до backend-сервера (спросит при установке)
+
+**Сервер Б (backend gateway — только WireGuard + NAT):**
+~~~bash
+sudo bash install_server_b.sh
+~~~
+
+Скрипт выполнит:
+1. Установка WireGuard
+2. Генерация ключей, создание конфига с PostUp правилами (NAT)
+3. Включение `net.ipv4.ip_forward`
+4. Запуск `wg-quick@wg0`
 
 ### 2) Конфигурация
 
@@ -98,14 +114,20 @@ sudo ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='StrongPassword123!' bash init
 cd /opt/mtproxy-manager && source .venv/bin/activate && python create_admin.py --create admin@example.com
 ~~~
 
-### 4) Проверка сервиса панели
+### 4) Применение миграций
+
+~~~bash
+sudo -u mtproxy bash -c 'cd /opt/mtproxy-manager && source .venv/bin/activate && flask db upgrade'
+~~~
+
+### 5) Проверка сервиса панели
 
 ~~~bash
 sudo systemctl status mtproxy-manager --no-pager
 sudo journalctl -u mtproxy-manager -f
 ~~~
 
-### 5) Доступ к панели
+### 6) Доступ к панели
 
 Если `MANAGER_BIND_HOST=127.0.0.1`, используйте SSH-туннель:
 ~~~bash
@@ -113,6 +135,57 @@ ssh -L 5000:127.0.0.1:5000 root@SERVER_IP
 ~~~
 
 Открыть локально: `http://127.0.0.1:5000`
+
+## Frontend / Backend (VPN tunnel)
+
+### Архитектура
+
+```
+Клиенты → Сервер А (MTG + панель) → WireGuard → Сервер Б (NAT/gateway) → Telegram
+```
+
+- **Сервер А** — панель + MTG. Принимает клиентов, секрет хранится здесь.
+- **Сервер Б** — чистый шлюз. Только WireGuard + `ip_forward` + MASQUERADE. Без MTG, без панели.
+- Трафик от MTG до Telegram маршрутизируется через WireGuard туннель на сервер Б (NAT).
+
+### Роли инстансов
+
+В панели при создании инстанса можно выбрать роль:
+
+| Роль | Описание |
+|------|----------|
+| `standalone` (по умолчанию) | Обычный инстанс, MTG работает напрямую |
+| `frontend` | Инстанс на сервере А, трафик через ВПН-туннель на сервер Б |
+
+Для `frontend` нужно указать **IP сервера Б в туннеле** (например, `10.0.0.1`).
+
+### Установка
+
+**Сервер Б (однократно):**
+```bash
+sudo bash install_server_b.sh
+# Ввести IP сервера А, вставить его публичный ключ
+```
+
+**Сервер А:**
+```bash
+export FRONTEND_MODE=yes
+sudo bash install.sh
+# Или ответить "yes" на вопрос про frontend при установке
+```
+
+После установки обоих серверов:
+```bash
+# На сервере Б — скопировать публичный ключ Server B
+# На сервере А — вставить его в /etc/wireguard/wg0.conf
+systemctl enable --now wg-quick@wg0  # на обоих серверах
+```
+
+Проверка:
+```bash
+ping 10.0.0.1  # с сервера А
+ping 10.0.0.2  # с сервера Б
+```
 
 ## Multi-Instance MTG
 
@@ -135,6 +208,8 @@ bind-to = "127.0.0.1:31000"
 http-path = "/metrics"
 metric-prefix = "mtg"
 ~~~
+
+Для frontend-инстансов конфиг идентичен — маршрутизация на уровне OC (WireGuard + ip route).
 
 ### Управление
 
@@ -232,6 +307,7 @@ sudo ufw default allow outgoing
 sudo ufw allow OpenSSH
 sudo ufw allow 5000/tcp
 sudo ufw allow 10000:10100/tcp
+sudo ufw allow 51820/udp  # WireGuard (для frontend-режима)
 sudo ufw enable
 sudo ufw status
 ~~~
@@ -243,6 +319,7 @@ cd /opt/mtproxy-manager
 git pull --ff-only
 source .venv/bin/activate
 pip install -r requirements.txt
+flask db upgrade
 sudo systemctl restart mtproxy-manager
 ~~~
 
@@ -251,10 +328,13 @@ sudo systemctl restart mtproxy-manager
 Используется Flask-Migrate. Миграции в `app/migrations/versions/`:
 - `20261001_add_proxy_instances.py` — создание таблицы proxy_instances, миграция активных ключей из proxy_keys
 - `20261002_add_proxy_instance_limits.py` — добавление полей лимитов трафика в proxy_instances
+- `20261003_add_proxy_instance_roles.py` — добавление полей `role` (standalone/frontend) и `backend_tunnel_ip`
 
 Применить миграции:
 ~~~bash
 flask db upgrade
+# или
+sudo -u mtproxy bash -c 'cd /opt/mtproxy-manager && source .venv/bin/activate && flask db upgrade'
 ~~~
 
 ## Структура проекта
@@ -262,41 +342,41 @@ flask db upgrade
 ```
 mtproxy-manager/
 ├── app/
-│   ├── __init__.py          # Фабрика Flask-приложения
-│   ├── models.py            # SQLAlchemy модели
-│   ├── forms.py             # WTForms
+│   ├── __init__.py              # Фабрика Flask-приложения
+│   ├── models.py                # SQLAlchemy модели (включая role, backend_tunnel_ip)
+│   ├── forms.py                 # WTForms
 │   ├── routes/
-│   │   ├── auth.py          # Аутентификация
-│   │   ├── admin.py         # Админ-панель
-│   │   ├── keys.py          # Управление инстансами
-│   │   ├── users.py         # Управление пользователями
-│   │   ├── profile.py       # Профиль пользователя
-│   │   ├── scripts.py       # Безопасный запуск скриптов
-│   │   └── backup.py        # Управление бэкапами
+│   │   ├── auth.py              # Аутентификация
+│   │   ├── admin.py             # Админ-панель
+│   │   ├── keys.py              # Управление инстансами
+│   │   ├── users.py             # Управление пользователями
+│   │   ├── profile.py           # Профиль пользователя
+│   │   ├── scripts.py           # Безопасный запуск скриптов
+│   │   └── backup.py            # Управление бэкапами
 │   ├── services/
 │   │   ├── mtg_service.py       # Управление MTG
 │   │   ├── traffic_monitor.py   # Мониторинг трафика
 │   │   ├── backup_service.py    # Бэкапы
 │   │   ├── key_generator.py     # Генерация секретов
 │   │   └── system_monitor.py    # Мониторинг системы
-│   ├── templates/           # Jinja2 шаблоны
-│   ├── static/              # CSS, JS
-│   ├── migrations/          # Alembic миграции
-│   └── deploy/systemd/      # systemd unit
-├── data/                    # SQLite БД
-├── logs/                    # Логи
-├── backups/                 # Бэкапы
-├── scripts/                 # Пользовательские скрипты
-├── mtg/instances/           # TOML-конфиги инстансов
-├── run.py                   # Точка входа
-├── config.py                # Конфигурация
-├── requirements.txt         # Python-зависимости
-├── install.sh               # Установщик
-
-├── init_app.sh              # Инициализация БД
-├── create_admin.py          # CLI управление админами
-├── .env.example             # Пример конфига
-└── AGENTS.md                # Инструкции для AI-агентов
+│   ├── templates/               # Jinja2 шаблоны
+│   ├── static/                  # CSS, JS
+│   ├── migrations/              # Alembic миграции (3 шт.)
+│   └── deploy/systemd/          # systemd unit
+├── data/                        # SQLite БД
+├── logs/                        # Логи
+├── backups/                     # Бэкапы
+├── scripts/                     # Пользовательские скрипты
+├── mtg/instances/               # TOML-конфиги инстансов
+├── run.py                       # Точка входа
+├── config.py                    # Конфигурация
+├── requirements.txt             # Python-зависимости
+├── install.sh                   # Установщик для сервера А (панель + MTG + опц. WireGuard)
+├── install_server_b.sh          # Установщик для сервера Б (только WireGuard + NAT)
+├── init_app.sh                  # Инициализация БД
+├── create_admin.py              # CLI управление админами
+├── .env.example                 # Пример конфига
+└── AGENTS.md                    # Инструкции для AI-агентов
 ```
 
 ## Используемые библиотеки, ПО и ссылки
@@ -329,15 +409,9 @@ mtproxy-manager/
 - [MTG (9seconds/mtg)](https://github.com/9seconds/mtg) — MIT
 - [systemd](https://systemd.io/) — LGPL-2.1-or-later
 - [SQLite](https://sqlite.org/) — Public Domain
+- [WireGuard](https://www.wireguard.com/) (опционально) — GPL-2.0
 - [Nginx](https://nginx.org/) (опционально) — BSD-2-Clause
 - [Debian](https://www.debian.org/) — свободное ПО
-
-### Инструменты безопасности и аудита (рекомендуемые)
-
-- [pip-audit](https://github.com/pypa/pip-audit) — Apache-2.0
-- [Bandit](https://bandit.readthedocs.io/) — Apache-2.0
-- [Semgrep](https://semgrep.dev/) — LGPL-2.1 (engine)
-- [Gitleaks](https://github.com/gitleaks/gitleaks) — MIT
 
 ## Лицензия
 

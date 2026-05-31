@@ -46,6 +46,23 @@
         {% endfor %}
       </p>
 
+      <p>
+        {{ form.role.label }}<br>
+        {{ form.role(class_="form-select", id="role_select") }}
+        {% for e in form.role.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
+      <p id="backend_ip_block" style="display:none;">
+        {{ form.backend_tunnel_ip.label }}<br>
+        {{ form.backend_tunnel_ip(class_="form-input", size=24, placeholder="10.0.0.1") }}
+        <small style="display:block;color:#666;">IP адрес сервера Б внутри WireGuard туннеля. Маршрутизация до Telegram осуществляется через этот сервер (NAT/gateway).</small>
+        {% for e in form.backend_tunnel_ip.errors %}
+          <span class="text-danger">{{ e }}</span>
+        {% endfor %}
+      </p>
+
       {% if current_user.is_admin %}
       <p>
         {{ form.owner_user_id.label }}<br>
@@ -112,7 +129,16 @@
     }
   }
 
+  function toggleRoleFields() {
+    const role = document.getElementById("role_select").value;
+    const block = document.getElementById("backend_ip_block");
+    block.style.display = role === "frontend" ? "block" : "none";
+  }
+
   document.getElementById("limit_period").addEventListener("change", toggleLimitInput);
   toggleLimitInput();
+
+  document.getElementById("role_select").addEventListener("change", toggleRoleFields);
+  toggleRoleFields();
 </script>
 {% endblock %}
